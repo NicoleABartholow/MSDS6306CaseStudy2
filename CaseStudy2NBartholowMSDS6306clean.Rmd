@@ -39,19 +39,20 @@ CS2Val <- read.csv("./Analysis/Data/CaseStudy2Validation.csv", header=TRUE) #imp
 #Analysis of missing/unneccesary data
 ```{r}
 EmptyCols <- colSums(is.na(CS2Data))#Check for NA - zero NA fields
+
 #Remove columns that are irrelevant or have only one value
+#Feel free to clean this ugliness 
+#This was the cleanest way I knew to get rid of several specific columns not next to each other
 CS2DataRelevant <- CS2Data[,-10] #remove Employee Count
-CS2DataRelevant <- CS2DataRelevant[,-22] #remove Over18
-CS2DataRelevant <- CS2DataRelevant[,-26] #remove StandardHours
-CS2DataRelevant <- CS2DataRelevant[,-1] #remove ID
-CS2DataRelevant <- CS2DataRelevant[,-33] #remove Rand
+CS2DataRelevant <- CS2DataRelevant[,-22] #remove Over18 - always Yes
+CS2DataRelevant <- CS2DataRelevant[,-26] #remove StandardHours - always 80
+CS2DataRelevant <- CS2DataRelevant[,-34] #remove Rand
 
 #Make test and train the same
 CS2ValRel <- CS2Val[,-10] #remove Employee Count
 CS2ValRel <- CS2ValRel[,-22] #remove Over18
 CS2ValRel <- CS2ValRel[,-26] #remove StandardHours
-CS2ValRel <- CS2ValRel[,-1] #remove ID
-CS2ValRel <- CS2ValRel[,-33] #remove Rand
+CS2ValRel <- CS2ValRel[,-34] #remove Rand
 
 ```
 
@@ -65,17 +66,20 @@ plot_histogram(CS2Data)
 ggplot(data = CS2Data, mapping = aes(x = Attrition, y = Age)) +
   geom_boxplot()
 ggplot(data = CS2Data, mapping = aes(x = Attrition, y = JobSatisfaction)) +
-  geom_boxplot() #JobSatid=sfaction of 1
+  geom_boxplot() #JobSatisfaction of 1
+#Continuous variable needs a different visual
 #ggplot(data = CS2Data, mapping = aes(x = Attrition, y = BusinessTravel)) +
   geom_boxplot()
 ggplot(data = CS2Data, mapping = aes(x = Attrition, y = DailyRate)) +
   geom_boxplot()
+#Continuous variable needs a different visual
 #ggplot(data = CS2Data, mapping = aes(x = Attrition, y = Department)) +
   geom_boxplot()
 ggplot(data = CS2Data, mapping = aes(x = Attrition, y = DistanceFromHome)) +
   geom_boxplot()
 ggplot(data = CS2Data, mapping = aes(x = Attrition, y = Education)) +
   geom_boxplot()
+#Continuous variable needs a different visual
 #ggplot(data = CS2Data, mapping = aes(x = Attrition, y = EducationField)) +
   geom_boxplot()
 ggplot(data = CS2Data, mapping = aes(x = Attrition, y = EnvironmentSatisfaction)) +
@@ -88,6 +92,7 @@ ggplot(data = CS2Data, mapping = aes(x = Attrition, y = JobInvolvement)) +
   geom_boxplot()
 ggplot(data = CS2Data, mapping = aes(x = Attrition, y = JobLevel)) +
   geom_boxplot()#level 1
+#Continuous variable needs a different visual
 #ggplot(data = CS2Data, mapping = aes(x = Attrition, y = JobRole)) +
   geom_boxplot()
 #ggplot(data = CS2Data, mapping = aes(x = Attrition, y = MaritalStatus)) +
@@ -129,41 +134,96 @@ model <- glm(formula = Attrition ~ ., family = binomial(link = "logit"), data = 
 summary(model)
 
 
-#knn Regression for Attrition
+
 #Turn Factors into integers 
 CS2DataRelevant$OTInt <- as.integer(CS2DataRelevant$OverTime)
 #CS2DataRelevant$AttInt <- as.integer(CS2DataRelevant$Attrition)
 CS2ValRel$OTInt <- as.integer(CS2Val$OverTime)
 CS2Val$AttInt <- as.integer(CS2Val$Attrition)
-#fit3 = knnreg(x = CS2DataRelevant[, c(10, 20, 33)], y = CS2DataRelevant$Att, k=3)
-#PredsTest3 <-predict(fit3, CS2Val[,c(12, 22, 38)])
-#ASETestAtt3 = sum((PredsTest3 - CS2Val$AttInt)^2)/(length(CS2Val$Att))
+
 
 #kNN for Attrition
 #make the models the same
 
+#k = 34 (Square root of number of observations in training set) Overall Accuracy .8367
+results34 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=34)
+CS2ValRel$AttPred34 <- results34
+confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred34))
 
-#results <- class::knn(CS2DataRelevant[, c(10, 20, 33)], CS2Val[,c(12, 22, 38)], CS2DataRelevant$Att, k=3)
-#Overall Accuracy 0.8267
-results3 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=3)
-CS2ValRel$AttPred3 <- results3
-confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred3))
-
-#Overall Accuracy 0.83
+#k = 5 Overall Accuracy 0.83
 results5 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=5)
 CS2ValRel$AttPred5 <- results5
 confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred5))
 
-#Overall Accuracy 0.8333
+#k = 10 Overall Accuracy 0.8333
 results10 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=10)
 CS2ValRel$AttPred10 <- results10
 confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred10))
 
-#Overall Accuracy 0.8333
-results10 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=10)
-CS2ValRel$AttPred10 <- results10
-confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred10))
+#k = 20 Overall Accuracy 0.8333
+results20 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=20)
+CS2ValRel$AttPred20 <- results20
+confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred20))
 
+
+
+#k = 30 0Overall Accuracy Overall Accuracy .8367
+results30 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=30)
+CS2ValRel$AttPred30 <- results30
+confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred30))
+
+#k = 37 0Overall Accuracy Overall Accuracy .8367
+results37 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=37)
+CS2ValRel$AttPred37<- results37
+confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred37))
+#k = 33 0Overall Accuracy Overall Accuracy .8367
+results33 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=33)
+CS2ValRel$AttPred33<- results33
+confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred33))
+#k = 35 0Overall Accuracy Overall Accuracy .8367
+results35 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=35)
+CS2ValRel$AttPred35<- results35
+confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred35))
+
+#k = 70 Overall Accuracy Overall Accuracy .8367
+results45 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=70)
+CS2ValRel$AttPred45<- results45
+confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred45))
+
+#Try with additional variables - does not improve accuracy over .8367
+#k = 34 (Square root of number of observations in training set) Overall Accuracy .8367
+results34 <- class::knn(CS2DataRelevant[,c(10, 13, 16, 20, 33)], CS2ValRel[,c(10, 13, 16, 20, 33)], CS2DataRelevant$Att, k=34)
+CS2ValRel$AttPred34 <- results34
+confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred34))
+
+
+
+
+#knn Regression for Attrition - what does it look like when we make the prediction a conitnuous variable?
+#fit3 = knnreg(x = CS2DataRelevant[, c(10, 20, 33)], y = CS2DataRelevant$Att, k=3)
+#PredsTest3 <-predict(fit3, CS2Val[,c(12, 22, 38)])
+#ASETestAtt3 = sum((PredsTest3 - CS2Val$AttInt)^2)/(length(CS2Val$Att))
+
+
+#Logistic Regression for Competition
+#create a dataset for prediction
+
+
+CS2LRModel <- data.frame(cbind(CS2DataRelevant$ID, CS2DataRelevant$Attrition, CS2DataRelevant$OverTime, CS2DataRelevant$EnvironmentSatisfaction, CS2DataRelevant$NumCompaniesWorked, CS2DataRelevant$JobInvolvement, CS2DataRelevant$BusinessTravel, CS2DataRelevant$YearsSinceLastPromotion, CS2DataRelevant$JobSatisfaction))
+CS2LRModel$Attrition <- CS2LRModel$Attrition - 1
+
+colnames(CS2LRModel) <- c('ID', 'Attrition', 'OverTime', 'EnvironmentSatisfaction', 'NumCompaniesWorked', 'JobInvolvement', 'BusinessTravel', 'YearsSinceLastPromotion', 'JobSatisfaction')
+
+model <- glm(formula = Attrition ~ ., family = binomial(link = "logit"), data = CS2LRModel)
+summary(model)
+model <- glm(formula = Attrition ~  OverTime+EnvironmentSatisfaction + NumCompaniesWorked + JobInvolvement + BusinessTravel + YearsSinceLastPromotion + JobSatisfaction, family = binomial(link = "logit"), data = CS2LRModel)
+summary(model)
+
+CS2LRModel <- CS2LRModel[,-7] #remove 'YearsSinceLastPromotion', 'JobSatisfaction'
+CS2LRModel <- CS2LRModel[,-7] #remove 'YearsSinceLastPromotion', 'JobSatisfaction'
+
+model <- glm(formula = Attrition ~  OverTime+EnvironmentSatisfaction + NumCompaniesWorked + JobInvolvement , family = binomial(link = "logit"), data = CS2LRModel)
+summary(model)
 ```
 
 
@@ -184,12 +244,8 @@ BBGraph %>%
   kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
-##Missing Data Analysis
-###Some notes about the data - we ran a check for missing columns, and note the following: 
-#### There are 62 beers missing both the ABV measurement and IBU measurements.
-#### There are an additional 943 beers missing only the IBU measurement.
-#### There are no other missing data points in the dataframe. Some missing data could be imputed if justified by a further study.  
-####Also, a visual check of the data revealed that some beers have multiple entries marked with different years, possibly due to reformulation. We did not analyze the number of reformulations for this presentation but feel it is a good idea to vet these before the next steps. 
+
+####OLD BEER CODE IN CASE TO USE
 ```{r get number of NAs in each column, include = TRUE}
 EmptyCols <- colSums(is.na(BeerBreweries)) #Count the number of NAs in each column
 EmptyCols <- EmptyCols[EmptyCols !=0] #Only report on columns that have NA values
@@ -200,8 +256,6 @@ BeerBreweriesNA <- BeerBreweries[is.na(BeerBreweries$ABV == "NA"),]  #Everything
 ```
 
 
-###Brewery Production
-#### We ordered the breweries by number of beers produced.  We also ran summary statistics for brewery size, shown in figure 2.  The median number of beers per brewery is 3. But if we take a deeper look, that is also quite variable, like the breweries per state.  One brewery produces 62 of these beers, while 120 breweries produce only 1 beer each.  
 ```{r Size of Breweries}
 BeerCount <- data.frame(sort(table(BeerBreweries$BreweryName), decreasing=TRUE))#how many beers do these breweries produce
 colnames(BeerCount)<- c("BreweryName", "NumberOfBeers") #assign column names for output
@@ -213,11 +267,6 @@ ggplot(BeerCount, aes(x=1, y=NumberOfBeers)) + geom_boxplot() + scale_x_continuo
 
 
 ##Craft Beer Styles
-###IPA & Varietals Market Share
-####To find out more about the market, we analyzed craft beer styles.  Some styles are close in temperment, or are too few to include as a separate entity. We combined those for analysis.  
-####Figure 3 shows that ten beer styles account for half of the craft beers made in America
-####“Other” styles is comprised of 90 different styles, each with fewer than 50 beers of its type
-####IPA varietals have a 23.8% market share. American Pale Ales with IBU > 40 could easily be marketed and sold as IPAs. Including these increases share to 27.6% 
 ```{r Brew Style Analysis}
 BeerBreweries$FacStyle <- BeerBreweries$Style
 #Assign meaning style factors only if beers of that style > 50, all others assigned to other
@@ -240,9 +289,7 @@ ggplot(StyleCount, aes(Style, NumberOfBeers, fill=Style)) + geom_bar(stat = "ide
 ```
 
 
-####An IPA is defined in part by higher IBU.  We separated the data with IBU into IPA Varietals and Non IPAs to show histograms of the IBU difference. Compare the distributions of IPA IBU ratings versus non-IPA varietals (figs 4 & 5)
-####IPA median IBU is 70 units, while Other varietal median IBU is 27 units.
-####By comparison to our best-sellers, Bud Light registers 27 IBU and Budweiser registers 12 IBU.
+####An IPA is defined in part by higher IBU.  We separated the data with IBU into IPA Varietals and Non 
 ```{r IBU Comparison between IPA and Other Varieties}
 BigIPA <- BeerBreweries[grep("IPA|India", BeerBreweries$Style), ]#IPA only - 574 total, 395 have IBU data
 IPAwIBU <- BigIPA[!is.na(BigIPA$IBU),]#remove observations that don't have IBU data
@@ -256,8 +303,6 @@ j + geom_histogram(position = "identity", binwidth = 8, fill="yellow", colour = 
 
 
 ###ABV-IBU Relationship
-####ABV and IBU have an obvious positive relationship.  A correlation analysis of the data reports a positive correlation of .67 (fig. 6). 
-####High IBU beers usually have higher ABV.  Also, observe that the IBU range increases as ABV increases.
 ```{r IBU ABV Correlation}
 BeerBreweriesNoNA <- BeerBreweries[!is.na(BeerBreweries$IBU == "NA"),]
 ggplot(BeerBreweriesNoNA, aes(ABV, IBU)) + geom_point() + ggtitle("IBU - ABV Correlation, fig. 6")
@@ -266,12 +311,6 @@ ABVIBU <-cor(Beers$ABV, Beers$IBU, use = "complete.obs") #get correlation of ABV
 
 
 #ABV-IBU Across the Country
-###Median ABV and IBU by State
-####We aggregated data by state to highlight regional preferences and variability in the data. We expect medians to be more consistent than inidivual observations since they are an accumulation of values.  #as you can see the individual data is far more extreme than medians reflect.
-####Median ABV is relatively consistent across states, with a low of 4% in Utah to a high of 6.25% in Kentucky and Washington DC, with a median of 5.6%.
-####Colorado produces the beer with the single highest ABV, at 12.8%. 
-####On the other hand, Median IBU has a relatively broad range, with a minimum of 19 units in Wisconsin to a maximum of 61 units on Maine, with a median of 35 units.  This reflects the extremely broad range of the individual beers, which is due to style variety.  While fermentation has traditionally produced a consistent ABV range,  IBU dictates taste and is more broadly developed.  
-####Oregon produces the bitterest single beer, at 138 IBU.  That said, science has shown that human taste buds cannot register IBU over 100 units.
 ```{r Create Barcharts of IBU and ABV by State}
 #create vectors of medians by state for measurements of interest ABV and IBU
 attach(BeerBreweries) #attaching dataset here alleviates errors
@@ -307,14 +346,13 @@ ggplot(BeerBreweriesNoNA, aes(x=1, y=ABV)) + geom_boxplot() + scale_x_continuous
 ###Recommendations Summary
 ####To recap the opportunities, the American  market devours IPA. A-B needs to expand its taste portfolio like its competitors, there are many craft breweries producing beers that could compliment our portfolio of offerings and set us up to create new, non-alcoholic offerings with our ZERO process.
 
-####We know from experience it is much easier to penetrate the market through partnership than through in-house development, and competitors have already done this such as  Heineken partnership with Lagunitas IPA and Molson-Coors portfolio of craft breweries
 
 
 #### Other References 
 ###Youtube PowerPoint Presentation
 #### https://youtu.be/X7wWLbDmeDM
 ###Github Respository
-####https://github.com/NicoleABartholow/MSDS6306CaseStudy1
+####https://github.com/NicoleABartholow/MSDS6306CaseStudy2
 
 
 

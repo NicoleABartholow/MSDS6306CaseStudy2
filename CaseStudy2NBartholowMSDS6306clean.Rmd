@@ -7,6 +7,7 @@ output: pdf_document
 
 ```{r Setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
 library(DataExplorer)
 library(dplyr)
 library(plyr)
@@ -17,7 +18,9 @@ library(gridExtra)
 library(grid)
 library(mlr)
 library(caret)
+library(class)
 
+tidyverse_conflicts()
 ```
 
 #Introduction
@@ -28,12 +31,17 @@ library(caret)
 
 ####First we bring in the data provided and clean it up for analysis.  
 ####The current population data 
-```{r Read Breweries and read Beers files into dataframes}
+```{r Read Attrition Data}
 #set working directory for local computer
 #REPRODUCIBLE TIP - CHANGE THIS WORKING DIRECTORY FOR YOUR REPRODUCTION ENVIRONMENT
-setwd("/Users/nicolealphin/Desktop/DataScience/MSDS6306-DoingDataScience/HW/CaseStudy2")
-CS2Data <- read.csv("./Analysis/Data/CaseStudy2-data.csv", header=TRUE) #import HR Data into CS2Data dataframe
-CS2Val <- read.csv("./Analysis/Data/CaseStudy2Validation.csv", header=TRUE) #import HR Validation Set into CS2Val dataframe
+
+PATH <- "/Users/Chase/Desktop/MSDS/CaseStudy2data.csv"
+PATH2 <- "/Users/Chase/Desktop/MSDS/CaseStudy2Validation.csv"
+
+
+CS2Data <- read.csv(PATH, header = TRUE) #import HR Data into CS2Data dataframe
+CS2Val <- read.csv(PATH2, header = TRUE) #import HR Validation Set into CS2Val dataframe
+
 ```
 
 #Analysis of missing/unneccesary data
@@ -53,6 +61,76 @@ CS2ValRel <- CS2Val[,-10] #remove Employee Count
 CS2ValRel <- CS2ValRel[,-22] #remove Over18
 CS2ValRel <- CS2ValRel[,-26] #remove StandardHours
 CS2ValRel <- CS2ValRel[,-34] #remove Rand
+
+
+CS2DataRelevant <- within(CS2DataRelevant, {
+  Gender.Ch <- C(Gender, treatment)
+  print(attributes(Gender.Ch))
+})
+
+CS2DataRelevant <- within(CS2DataRelevant, {
+  OverTime.Ch <- C(OverTime, treatment)
+  print(attributes(OverTime.Ch))
+})
+
+#Turn Factors into integers 
+CS2DataRelevant$OTInt <- as.integer(CS2DataRelevant$OverTime)
+
+head(CS2DataRelevant)
+
+
+```
+
+```{r Attrition with Income/Rates Graphs}
+## The following plots compare Income rates given with Attrition
+g1 <- ggplot(CS2DataRelevant, aes(x = MonthlyIncome, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
+
+g2 <- ggplot(CS2DataRelevant, aes(x = MonthlyRate, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
+
+g3 <- ggplot(CS2DataRelevant, aes(x = HourlyRate, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
+
+g4 <- ggplot(CS2DataRelevant, aes(x = DailyRate, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
+
+OTg <- ggplot(CS2DataRelevant, aes(x = OTInt, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
+
+## Box Plot of Job Roles compared to OT grouped by Attrition 
+OTg2 <- ggplot(CS2DataRelevant, aes(x = JobRole, y = OTInt, fill = Attrition)) + geom_bar(stat = "identity") + scale_fill_manual(values = c("#386cb0", "#ffa500")) + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + coord_flip()
+
+grid.arrange(g1, g2, g3, g4, OTg, OTg2, ncol = 2, nrow = 3)
+
+```
+```{r Attrition More Graphs}
+## Total Counts of Attrition Yes VS No
+g6 <- ggplot(CS2DataRelevant, aes(x = Attrition)) + geom_histogram(stat="count", position = "stack", fill = c("#386cb0","#ffa500"))
+
+## Distance from home related to Attrition Density
+g1 <- ggplot(CS2DataRelevant, aes(x = DistanceFromHome, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+
+## Job Satisfaction related to Attrition Density
+g2 <- ggplot(CS2DataRelevant, aes(x = JobSatisfaction, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+
+## Percentage of Salary Hike related to Attrition Density
+g3 <- ggplot(CS2DataRelevant, aes(x = PercentSalaryHike, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+
+## Environment Satisfaction related to Attrition Density
+g4 <- ggplot(CS2DataRelevant, aes(x = EnvironmentSatisfaction, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+
+## Work Life Balance related to Attrition Density
+g7 <- ggplot(CS2DataRelevant, aes(x = WorkLifeBalance, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+
+## Years at the company related to Attrition Density
+g8 <- ggplot(CS2DataRelevant, aes(x = YearsAtCompany, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+
+
+grid.arrange(g1, g2, g3, g4, g7, g8, ncol = 2, nrow = 3)
+
+## Count of Attrition Stacked by Job Role
+g5 <- ggplot(CS2DataRelevant, aes(x = JobRole, fill = Attrition)) + geom_histogram(stat="count", position = "stack") + scale_fill_manual(values = c("#386cb0", "#ffa500")) + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+## Box Plot of Job Roles compared to Monthly Income grouped by Attrition 
+ggplot(CS2DataRelevant, aes(JobRole, MonthlyIncome,  fill = Attrition)) + geom_boxplot(alpha = 0.5) + coord_flip() + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+
+grid.arrange(g5, g6, ncol = 2, nrow = 1)
 
 ```
 
@@ -127,8 +205,10 @@ ggplot(data = CS2Data, mapping = aes(x = Attrition, y = YearsWithCurrManager)) +
   geom_boxplot()
 ggplot(data = CS2Data, mapping = aes(x = Attrition, y = OverTime)) +
   geom_boxplot()
+```
 
 
+```{r}
 #Logistic Regression for Competition
 model <- glm(formula = Attrition ~ ., family = binomial(link = "logit"), data = CS2DataRelevant)
 summary(model)
@@ -189,7 +269,9 @@ confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred35))
 results45 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=70)
 CS2ValRel$AttPred45<- results45
 confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred45))
+```
 
+```{r This part does not work for me}
 #Try with additional variables - does not improve accuracy over .8367
 #k = 34 (Square root of number of observations in training set) Overall Accuracy .8367
 results34 <- class::knn(CS2DataRelevant[,c(10, 13, 16, 20, 33)], CS2ValRel[,c(10, 13, 16, 20, 33)], CS2DataRelevant$Att, k=34)
@@ -197,8 +279,9 @@ CS2ValRel$AttPred34 <- results34
 confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred34))
 
 
+```
 
-
+```{r}
 #knn Regression for Attrition - what does it look like when we make the prediction a conitnuous variable?
 #fit3 = knnreg(x = CS2DataRelevant[, c(10, 20, 33)], y = CS2DataRelevant$Att, k=3)
 #PredsTest3 <-predict(fit3, CS2Val[,c(12, 22, 38)])
@@ -227,130 +310,6 @@ summary(model)
 ```
 
 
-
-
-
-####Two thousand four hundred and ten craft beers are produced within the United States.  We combine the Brewery and Beer data and then ordered by Beer ID.  As a result, the first six beers and last six beers each come from only two breweries total in table 2.
-```{r Merge Breweries and Beers dataframes by Brewery ID}
-BeerBreweries <- merge(x = Breweries, y = Beers, by.x=c("Brew_ID"), by.y =c("Brewery_id"), all=FALSE) #combine Breweries and Beers dataframes on their common column, Brewery_ID/Brew_ID
-#identical(nrow(Beers),nrow(BeerBreweries)) #confirm number of rows remains constant from Beers to Beer Breweries to verify merge
-colnames(BeerBreweries) <- c("BreweryID","BreweryName","City","State","StateName","BeerName","BeerID","ABV","IBU","Style","Ounces") #update column names for clarification
-BeerBreweries <- BeerBreweries[order(BeerBreweries$BeerID),]#order by Beer ID
-BBHead <- head(BeerBreweries, 6) #create dataframe of first 6 rows
-BBTail <- tail(BeerBreweries, 6) #create dataframe of last 6 rows
-BBGraph <- rbind(BBHead,BBTail) #combine dataframes for presentation
-BBGraph %>%
-  kable() %>%
-  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
-```
-
-
-####OLD BEER CODE IN CASE TO USE
-```{r get number of NAs in each column, include = TRUE}
-EmptyCols <- colSums(is.na(BeerBreweries)) #Count the number of NAs in each column
-EmptyCols <- EmptyCols[EmptyCols !=0] #Only report on columns that have NA values
-#EmptyCols %>%
-#  kable() %>%
-#  kable_styling(bootstrap_options = "striped", full_width = F, position = "left") #This information looks too strange in a table.  Pushing output to a sentence in writup.
-BeerBreweriesNA <- BeerBreweries[is.na(BeerBreweries$ABV == "NA"),]  #Everything with no ABV also has no IBU
-```
-
-
-```{r Size of Breweries}
-BeerCount <- data.frame(sort(table(BeerBreweries$BreweryName), decreasing=TRUE))#how many beers do these breweries produce
-colnames(BeerCount)<- c("BreweryName", "NumberOfBeers") #assign column names for output
-SumBeers <- summary(BeerCount$NumberOfBeers)
-#SumBeers <- round(SumBeers, digits = 1)
-# median 3, mean 4.4, min 1, max 62
-ggplot(BeerCount, aes(x=1, y=NumberOfBeers)) + geom_boxplot() + scale_x_continuous(breaks=NULL) + theme(axis.title.x = element_blank())+ ggtitle("Summary Statistics: Number of Beers Produced by Brewery, fig. 2")
-```
-
-
-##Craft Beer Styles
-```{r Brew Style Analysis}
-BeerBreweries$FacStyle <- BeerBreweries$Style
-#Assign meaning style factors only if beers of that style > 50, all others assigned to other
-#10 style > 50, 90 styles <50
-Styles <- c("American IPA","American Pale Ale (APA)", "American Amber / Red Ale", "American Amber / Red Lager", "American Blonde Ale", "American Double / Imperial IPA", "American Pale Wheat Ale", "American Brown Ale", "American Porter", "Saison / Farmhouse Ale","Witbier")
-StylesF <- c("American/Double/Iperial IPA","American Pale Ale (APA)", "American Amber / Red Ale", "American Amber / Red Ale", "American Blonde Ale", "American/Double/Iperial IPA", "American Pale Wheat Ale", "American Brown Ale", "American Porter", "Saison / Farmhouse Ale","Witbier")
-
-BeerBreweries$FacStyle = factor(BeerBreweries$FacStyle, levels=Styles, labels = StylesF) #assign relevant styles
-#group small styles
-BeerBreweries$FacStyle <- as.character(BeerBreweries$FacStyle)
-BeerBreweries$FacStyle[!(BeerBreweries$FacStyle %in% StylesF)] = "Other"
-BeerBreweries$FacStyle <- as.factor(BeerBreweries$FacStyle)
-
-StyleCount <- data.frame(sort(table(BeerBreweries$FacStyle), decreasing=TRUE))
-colnames(StyleCount)<- c("Style", "NumberOfBeers")
-#SumStyles <- summary(StyleCount$NumberOfBeers)
-#SumStyles <- round(SumStyles, digits = 1)
-
-ggplot(StyleCount, aes(Style, NumberOfBeers, fill=Style)) + geom_bar(stat = "identity") + ggtitle("Total Beers Produced by Style, fig. 3") + theme(legend.position = "none", axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5)) + ylab("Total Beers by Style")
-```
-
-
-####An IPA is defined in part by higher IBU.  We separated the data with IBU into IPA Varietals and Non 
-```{r IBU Comparison between IPA and Other Varieties}
-BigIPA <- BeerBreweries[grep("IPA|India", BeerBreweries$Style), ]#IPA only - 574 total, 395 have IBU data
-IPAwIBU <- BigIPA[!is.na(BigIPA$IBU),]#remove observations that don't have IBU data
-h <- ggplot(IPAwIBU, aes(x=IBU)) + geom_histogram(position = "identity")
-h + geom_histogram(position = "identity", binwidth = 8, fill="yellow", colour = "red")+ ggtitle("IBU Distribution for IPA Varietals, fig. 4")
-OtherBeers <- BeerBreweries[-grep("IPA|India", BeerBreweries$Style), ] #all non-IPA beers into one list
-OtherBeers <- OtherBeers[!is.na(OtherBeers$IBU),]#remove observations that don't have IBU data
-j <- ggplot(OtherBeers, aes(x=IBU)) + geom_histogram(position = "identity")
-j + geom_histogram(position = "identity", binwidth = 8, fill="yellow", colour = "red")+ ggtitle("IBU Distribution for non-IPA Varietals, fig 5")
-```
-
-
-###ABV-IBU Relationship
-```{r IBU ABV Correlation}
-BeerBreweriesNoNA <- BeerBreweries[!is.na(BeerBreweries$IBU == "NA"),]
-ggplot(BeerBreweriesNoNA, aes(ABV, IBU)) + geom_point() + ggtitle("IBU - ABV Correlation, fig. 6")
-ABVIBU <-cor(Beers$ABV, Beers$IBU, use = "complete.obs") #get correlation of ABV IBU
-```
-
-
-#ABV-IBU Across the Country
-```{r Create Barcharts of IBU and ABV by State}
-#create vectors of medians by state for measurements of interest ABV and IBU
-attach(BeerBreweries) #attaching dataset here alleviates errors
-ABVMedians <- aggregate(ABV ~ StateName, data=BeerBreweries, median) #calculate median ABV by state
-IBUMedians <- aggregate(IBU ~ StateName, data=BeerBreweries, median) #calculate median IBU by state
-#ordered Barchart of Median Alcohol Content by State
-ggplot2::ggplot(ABVMedians, aes(x=reorder(StateName, -ABV), y=ABV, fill=StateName)) + geom_bar(stat = "identity") + ggtitle("Median Alcohol by Volume by State, fig. 7") + theme(legend.position = "none", axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5)) + xlab("State") + ylab("Median ABV")
-#+ scale_fill_hue(l=40, c=100)
-#ordered Barchart of Median Bitterness by State
-ggplot2::ggplot(IBUMedians, aes(x=reorder(StateName, -IBU), y=IBU, fill=StateName)) + geom_bar(stat = "identity") + ggtitle("Median IBU by Volume by State, fig. 8") + theme(legend.position = "none", axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5)) + xlab("State") + ylab("Median IBU") 
-#+ scale_fill_hue(l=40, c=100)
-
-IBUMedians$StateName <- as.character(IBUMedians$StateName)#convert state name column to character for which.max
-ABVMedians$StateName <- as.character(ABVMedians$StateName)#convert state name column to character for which.max
-StateMaxMedABV <- ABVMedians$StateName[which.max(ABVMedians$MedianABVPC)]#get the state with the highest median ABV
-StateMaxMedIBU <- IBUMedians$StateName[which.max(IBUMedians$MedianIBU)]#get the state with the highest median IBU
-BeerBreweries$StateName <- as.character(BeerBreweries$StateName)#convert state name column to character for which.max
-StateMaxABV <- BeerBreweries$StateName[which.max(BeerBreweries$ABV)]#get the state that produces the beers with the highest individua ABV
-StateMaxIBU <- BeerBreweries$StateName[which.max(BeerBreweries$IBU)]#get the state that produces the beers with the highest individual IBU
-```
-
-
-###Summary Statistics for Alcohol by Volume (ABV)
-####Digging into ABV, Beers in our study range in ABV from 0.1% to 12.8%, with 75% of beers falling between 5% and 6.7%.  The median ABV for the beers in our study is 5.6% and the mean is 6.0%
-```{r Summary statistics for ABV}
-#summary statistics for ABV Alcohol by Volume
-SummaryABV <- summary(BeerBreweries$ABV)
-BeerBreweriesNoNA <- BeerBreweries[!is.na(BeerBreweries$ABV == "NA"),]
-ggplot(BeerBreweriesNoNA, aes(x=1, y=ABV)) + geom_boxplot() + scale_x_continuous(breaks=NULL) + theme(axis.title.x = element_blank())+ ggtitle("Summary Statistics: Alcohol by Volume, fig. 9")
-```
-
-
-###Recommendations Summary
-####To recap the opportunities, the American  market devours IPA. A-B needs to expand its taste portfolio like its competitors, there are many craft breweries producing beers that could compliment our portfolio of offerings and set us up to create new, non-alcoholic offerings with our ZERO process.
-
-
-
-#### Other References 
-###Youtube PowerPoint Presentation
-#### https://youtu.be/X7wWLbDmeDM
 ###Github Respository
 ####https://github.com/NicoleABartholow/MSDS6306CaseStudy2
 

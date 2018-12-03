@@ -75,6 +75,7 @@ CS2DataRelevant <- within(CS2DataRelevant, {
 
 #Turn Factors into integers 
 CS2DataRelevant$OTInt <- as.integer(CS2DataRelevant$OverTime)
+CS2DataRelevant$GenderInt <- as.integer(CS2DataRelevant$Gender)
 
 head(CS2DataRelevant)
 
@@ -131,6 +132,17 @@ g5 <- ggplot(CS2DataRelevant, aes(x = JobRole, fill = Attrition)) + geom_histogr
 ggplot(CS2DataRelevant, aes(JobRole, MonthlyIncome,  fill = Attrition)) + geom_boxplot(alpha = 0.5) + coord_flip() + scale_fill_manual(values = c("#386cb0", "#ffa500"))
 
 grid.arrange(g5, g6, ncol = 2, nrow = 1)
+
+```
+
+```{r}
+library(GoodmanKruskal)
+library(corrplot)
+
+varset1 <- c("Attrition", "BusinessTravel", "Department", "EducationField", "Gender", "MaritalStatus","JobRole")
+CatFrame <- subset(CS2DataRelevant, select = varset1)
+GKmatrix1 <- GKtauDataframe(CatFrame)
+plot(GKmatrix1, corrColors = "blue")
 
 ```
 

@@ -1,13 +1,12 @@
 ---
-title: "Craft Beer Market Analysis"
+title: "HR Attrition Predictions"
 author: "Nicole Bartholow"
-date: "10/20/2018"
+date: "12/2/2018"
 output: pdf_document
 ---
 
 ```{r Setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-library(tidyverse)
 library(DataExplorer)
 library(dplyr)
 library(plyr)
@@ -18,9 +17,7 @@ library(gridExtra)
 library(grid)
 library(mlr)
 library(caret)
-library(class)
-
-tidyverse_conflicts()
+library(e1071)
 ```
 
 #Introduction
@@ -31,154 +28,93 @@ tidyverse_conflicts()
 
 ####First we bring in the data provided and clean it up for analysis.  
 ####The current population data 
-```{r Read Attrition Data}
+```{r Read Breweries and read Beers files into dataframes}
 #set working directory for local computer
 #REPRODUCIBLE TIP - CHANGE THIS WORKING DIRECTORY FOR YOUR REPRODUCTION ENVIRONMENT
-
-PATH <- "/Users/Chase/Desktop/MSDS/CaseStudy2data.csv"
-PATH2 <- "/Users/Chase/Desktop/MSDS/CaseStudy2Validation.csv"
-
-
-CS2Data <- read.csv(PATH, header = TRUE) #import HR Data into CS2Data dataframe
-CS2Val <- read.csv(PATH2, header = TRUE) #import HR Validation Set into CS2Val dataframe
-
+setwd("/Users/nicolealphin/Desktop/DataScience/MSDS6306-DoingDataScience/HW/CaseStudy2")
+DFTrain <- read.csv("./Analysis/Data/CaseStudy2-data.csv", header=TRUE) #import HR Data into DFTrain dataframe
+DFVal <- read.csv("./Analysis/Data/CaseStudy2Validation.csv", header=TRUE) #import HR Validation Set into DFVal dataframe
 ```
 
 #Analysis of missing/unneccesary data
 ```{r}
-EmptyCols <- colSums(is.na(CS2Data))#Check for NA - zero NA fields
+EmptyCols <- colSums(is.na(DFTrain))#Check for NA - zero NA fields
 
 #Remove columns that are irrelevant or have only one value
 #Feel free to clean this ugliness 
 #This was the cleanest way I knew to get rid of several specific columns not next to each other
-CS2DataRelevant <- CS2Data[,-10] #remove Employee Count
-CS2DataRelevant <- CS2DataRelevant[,-22] #remove Over18 - always Yes
-CS2DataRelevant <- CS2DataRelevant[,-26] #remove StandardHours - always 80
-CS2DataRelevant <- CS2DataRelevant[,-34] #remove Rand
+DFTrainRel <- DFTrain[,-10] #remove Employee Count
+
+DFTrainRel <- DFTrainRel[,-22] #remove Over18 - always Yes
+DFTrainRel <- DFTrainRel[,-26] #remove StandardHours - always 80
+DFTrainRel <- DFTrainRel[,-34] #remove Rand
+DFTrainRel <- DFTrainRel[,-10] #remove Employee Number
 
 #Make test and train the same
-CS2ValRel <- CS2Val[,-10] #remove Employee Count
-CS2ValRel <- CS2ValRel[,-22] #remove Over18
-CS2ValRel <- CS2ValRel[,-26] #remove StandardHours
-CS2ValRel <- CS2ValRel[,-34] #remove Rand
-
-
-CS2DataRelevant <- within(CS2DataRelevant, {
-  Gender.Ch <- C(Gender, treatment)
-  print(attributes(Gender.Ch))
-})
-
-CS2DataRelevant <- within(CS2DataRelevant, {
-  OverTime.Ch <- C(OverTime, treatment)
-  print(attributes(OverTime.Ch))
-})
-
-#Turn Factors into integers 
-CS2DataRelevant$OTInt <- as.integer(CS2DataRelevant$OverTime)
-CS2DataRelevant$GenderInt <- as.integer(CS2DataRelevant$Gender)
-
-head(CS2DataRelevant)
-
+DFValRel <- DFVal[,-10] #remove Employee Count
+DFValRel <- DFValRel[,-22] #remove Over18
+DFValRel <- DFValRel[,-26] #remove StandardHours
+DFValRel <- DFValRel[,-34] #remove Rand
+DFValRel <- DFValRel[,-10] #remove Employee Number
+#DFTrainRel <- within(DFTrainRel, {
+#  Gender.Ch <- C(Gender, treatment)
+#  print(attributes(Gender.Ch))
+#})
+#DFTrainRel <- within(DFTrainRel, {
+#  OverTime.Ch <- C(OverTime, treatment)
+#  print(attributes(OverTime.Ch))
+#})
 
 ```
 
 ```{r Attrition with Income/Rates Graphs}
 ## The following plots compare Income rates given with Attrition
-g1 <- ggplot(CS2DataRelevant, aes(x = MonthlyIncome, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
-
-g2 <- ggplot(CS2DataRelevant, aes(x = MonthlyRate, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
-
-g3 <- ggplot(CS2DataRelevant, aes(x = HourlyRate, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
-
-g4 <- ggplot(CS2DataRelevant, aes(x = DailyRate, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
-
-OTg <- ggplot(CS2DataRelevant, aes(x = OTInt, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
-
+g1 <- ggplot(DFTrainRel, aes(x = MonthlyIncome, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
+g2 <- ggplot(DFTrainRel, aes(x = MonthlyRate, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
+g3 <- ggplot(DFTrainRel, aes(x = HourlyRate, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
+g4 <- ggplot(DFTrainRel, aes(x = DailyRate, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
+OTg <- ggplot(DFTrainRel, aes(x = OTInt, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
 ## Box Plot of Job Roles compared to OT grouped by Attrition 
-OTg2 <- ggplot(CS2DataRelevant, aes(x = JobRole, y = OTInt, fill = Attrition)) + geom_bar(stat = "identity") + scale_fill_manual(values = c("#386cb0", "#ffa500")) + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + coord_flip()
+DFTrainRel$OTInt <- as.integer(DFTrainRel$OverTime)
+OTg2 <- ggplot(DFTrainRel, aes(x = JobRole, y = OTInt, fill = Attrition)) + geom_bar(stat = "identity") + scale_fill_manual(values = c("#386cb0", "#ffa500")) + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + coord_flip()
 
 grid.arrange(g1, g2, g3, g4, OTg, OTg2, ncol = 2, nrow = 3)
-
-```
-```{r Attrition More Graphs}
-## Total Counts of Attrition Yes VS No
-g6 <- ggplot(CS2DataRelevant, aes(x = Attrition)) + geom_histogram(stat="count", position = "stack", fill = c("#386cb0","#ffa500"))
-
-## Distance from home related to Attrition Density
-g1 <- ggplot(CS2DataRelevant, aes(x = DistanceFromHome, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
-
-## Job Satisfaction related to Attrition Density
-g2 <- ggplot(CS2DataRelevant, aes(x = JobSatisfaction, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
-
-## Percentage of Salary Hike related to Attrition Density
-g3 <- ggplot(CS2DataRelevant, aes(x = PercentSalaryHike, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
-
-## Environment Satisfaction related to Attrition Density
-g4 <- ggplot(CS2DataRelevant, aes(x = EnvironmentSatisfaction, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
-
-## Work Life Balance related to Attrition Density
-g7 <- ggplot(CS2DataRelevant, aes(x = WorkLifeBalance, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
-
-## Years at the company related to Attrition Density
-g8 <- ggplot(CS2DataRelevant, aes(x = YearsAtCompany, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
-
-
-grid.arrange(g1, g2, g3, g4, g7, g8, ncol = 2, nrow = 3)
-
-## Count of Attrition Stacked by Job Role
-g5 <- ggplot(CS2DataRelevant, aes(x = JobRole, fill = Attrition)) + geom_histogram(stat="count", position = "stack") + scale_fill_manual(values = c("#386cb0", "#ffa500")) + theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-## Box Plot of Job Roles compared to Monthly Income grouped by Attrition 
-ggplot(CS2DataRelevant, aes(JobRole, MonthlyIncome,  fill = Attrition)) + geom_boxplot(alpha = 0.5) + coord_flip() + scale_fill_manual(values = c("#386cb0", "#ffa500"))
-
-grid.arrange(g5, g6, ncol = 2, nrow = 1)
-
 ```
 
-```{r}
-library(GoodmanKruskal)
-library(corrplot)
-
-varset1 <- c("Attrition", "BusinessTravel", "Department", "EducationField", "Gender", "MaritalStatus","JobRole")
-CatFrame <- subset(CS2DataRelevant, select = varset1)
-GKmatrix1 <- GKtauDataframe(CatFrame)
-plot(GKmatrix1, corrColors = "blue")
-
-```
 
 
 #EDA/PCA
-```{r}
+```{r Plots}
 plot_str(CS2Data)
 plot_histogram(CS2Data)
 
 #Boxplots of each continuous variable against Attrition
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = Age)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = Age)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = JobSatisfaction)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = JobSatisfaction)) +
   geom_boxplot() #JobSatisfaction of 1
 #Continuous variable needs a different visual
 #ggplot(data = CS2Data, mapping = aes(x = Attrition, y = BusinessTravel)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = DailyRate)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = DailyRate)) +
   geom_boxplot()
 #Continuous variable needs a different visual
 #ggplot(data = CS2Data, mapping = aes(x = Attrition, y = Department)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = DistanceFromHome)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = DistanceFromHome)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = Education)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = Education)) +
   geom_boxplot()
 #Continuous variable needs a different visual
 #ggplot(data = CS2Data, mapping = aes(x = Attrition, y = EducationField)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = EnvironmentSatisfaction)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = EnvironmentSatisfaction)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = Gender)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = Gender)) +
   geom_boxplot() #EnvoronmentSatisfaction=1
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = HourlyRate)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = HourlyRate)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = JobInvolvement)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = JobInvolvement)) +
   geom_boxplot()
 ggplot(data = CS2Data, mapping = aes(x = Attrition, y = JobLevel)) +
   geom_boxplot()#level 1
@@ -187,129 +123,184 @@ ggplot(data = CS2Data, mapping = aes(x = Attrition, y = JobLevel)) +
   geom_boxplot()
 #ggplot(data = CS2Data, mapping = aes(x = Attrition, y = MaritalStatus)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = MonthlyIncome)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = MonthlyIncome)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = MonthlyRate)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = MonthlyRate)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = NumCompaniesWorked)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = NumCompaniesWorked)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = PercentSalaryHike)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = PercentSalaryHike)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = PerformanceRating)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = PerformanceRating)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = RelationshipSatisfaction)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = RelationshipSatisfaction)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = StockOptionLevel)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = StockOptionLevel)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = TotalWorkingYears)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = TotalWorkingYears)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = TrainingTimesLastYear)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = TrainingTimesLastYear)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = WorkLifeBalance)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = WorkLifeBalance)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = YearsAtCompany)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = YearsAtCompany)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = YearsInCurrentRole)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = YearsInCurrentRole)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = YearsSinceLastPromotion)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = YearsSinceLastPromotion)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = YearsWithCurrManager)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = YearsWithCurrManager)) +
   geom_boxplot()
-ggplot(data = CS2Data, mapping = aes(x = Attrition, y = OverTime)) +
+ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = OverTime)) +
   geom_boxplot()
 ```
 
+```{r Attrition More Graphs}
+## Total Counts of Attrition Yes VS No
+g6 <- ggplot(DFTrainRel, aes(x = Attrition)) + geom_histogram(stat="count", position = "stack", fill = c("#386cb0","#ffa500"))
+## Distance from home related to Attrition Density
+g1 <- ggplot(DFTrainRel, aes(x = DistanceFromHome, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+## Job Satisfaction related to Attrition Density
+g2 <- ggplot(DFTrainRel, aes(x = JobSatisfaction, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+## Percentage of Salary Hike related to Attrition Density
+g3 <- ggplot(DFTrainRel, aes(x = PercentSalaryHike, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+## Environment Satisfaction related to Attrition Density
+g4 <- ggplot(DFTrainRel, aes(x = EnvironmentSatisfaction, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+## Work Life Balance related to Attrition Density
+g7 <- ggplot(DFTrainRel, aes(x = WorkLifeBalance, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+## Years at the company related to Attrition Density
+g8 <- ggplot(DFTrainRel, aes(x = YearsAtCompany, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+grid.arrange(g1, g2, g3, g4, g7, g8, ncol = 2, nrow = 3)
+## Count of Attrition Stacked by Job Role
+g5 <- ggplot(DFTrainRel, aes(x = JobRole, fill = Attrition)) + geom_histogram(stat="count", position = "stack") + scale_fill_manual(values = c("#386cb0", "#ffa500")) + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+## Box Plot of Job Roles compared to Monthly Income grouped by Attrition 
+ggplot(DFTrainRel, aes(JobRole, MonthlyIncome,  fill = Attrition)) + geom_boxplot(alpha = 0.5) + coord_flip() + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+grid.arrange(g5, g6, ncol = 2, nrow = 1)
+```
 
-```{r}
-#Logistic Regression for Competition
-model <- glm(formula = Attrition ~ ., family = binomial(link = "logit"), data = CS2DataRelevant)
-summary(model)
-
-
-
-#Turn Factors into integers 
-CS2DataRelevant$OTInt <- as.integer(CS2DataRelevant$OverTime)
-#CS2DataRelevant$AttInt <- as.integer(CS2DataRelevant$Attrition)
-CS2ValRel$OTInt <- as.integer(CS2Val$OverTime)
-CS2Val$AttInt <- as.integer(CS2Val$Attrition)
-
-
+```{r models}
 #kNN for Attrition
-#make the models the same
 
-#k = 34 (Square root of number of observations in training set) Overall Accuracy .8367
-results34 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=34)
-CS2ValRel$AttPred34 <- results34
-confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred34))
+#k = 34 (Square root of number of observations in training set) Overall Accuracy .8367 
+#Sets everything to NO
+results34 <- class::knn(DFTrainRel[,c(10, 20, 33)], DFValRel[,c(10, 20, 33)], DFTrainRel$Att, k=34)
+DFValRel$AttPred34 <- results34
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred34))
+
+#k = 1 Overall Accuracy 0.73333
+#The only kNN where I predicted some of the positives
+results1 <- class::knn(DFTrainRel[,c(10, 20, 33)], DFValRel[,c(10, 20, 33)], DFTrainRel$Att, k=1)
+DFValRel$AttPred1 <- results1
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred1))
+
+#k = 2 Overall Accuracy 0.6767
+#The only kNN where I predicted some of the positives
+results2 <- class::knn(DFTrainRel[,c(10, 20, 33)], DFValRel[,c(10, 20, 33)], DFTrainRel$Att, k=2)
+DFValRel$AttPred2 <- results2
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred2))
+
+#k = 3 Overall Accuracy 0.6767
+#The only kNN where I predicted some of the positives correctly
+results3 <- class::knn(DFTrainRel[,c(10, 20, 33)], DFValRel[,c(10, 20, 33)], DFTrainRel$Att, k=3)
+DFValRel$AttPred3 <- results3
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred3))
 
 #k = 5 Overall Accuracy 0.83
-results5 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=5)
-CS2ValRel$AttPred5 <- results5
-confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred5))
+results5 <- class::knn(DFTrainRel[,c(10, 20, 33)], DFValRel[,c(10, 20, 33)], DFTrainRel$Att, k=5)
+DFValRel$AttPred5 <- results5
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred5))
 
-#k = 10 Overall Accuracy 0.8333
-results10 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=10)
-CS2ValRel$AttPred10 <- results10
-confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred10))
+#k = 10 Overall Accuracy 0.8267
+results10 <- class::knn(DFTrainRel[,c(10, 20, 33)], DFValRel[,c(10, 20, 33)], DFTrainRel$Att, k=10)
+DFValRel$AttPred10 <- results10
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred10))
 
-#k = 20 Overall Accuracy 0.8333
-results20 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=20)
-CS2ValRel$AttPred20 <- results20
-confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred20))
-
+#k = 20 Overall Accuracy .8367
+results20 <- class::knn(DFTrainRel[,c(10, 20, 33)], DFValRel[,c(10, 20, 33)], DFTrainRel$Att, k=20)
+DFValRel$AttPred20 <- results20
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred20))
 
 
 #k = 30 0Overall Accuracy Overall Accuracy .8367
-results30 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=30)
-CS2ValRel$AttPred30 <- results30
-confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred30))
+results30 <- class::knn(DFTrainRel[,c(10, 20, 33)], DFValRel[,c(10, 20, 33)], DFTrainRel$Att, k=30)
+DFValRel$AttPred30 <- results30
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred30))
 
-#k = 37 0Overall Accuracy Overall Accuracy .8367
-results37 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=37)
-CS2ValRel$AttPred37<- results37
-confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred37))
-#k = 33 0Overall Accuracy Overall Accuracy .8367
-results33 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=33)
-CS2ValRel$AttPred33<- results33
-confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred33))
-#k = 35 0Overall Accuracy Overall Accuracy .8367
-results35 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=35)
-CS2ValRel$AttPred35<- results35
-confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred35))
 
-#k = 70 Overall Accuracy Overall Accuracy .8367
-results45 <- class::knn(CS2DataRelevant[,c(10, 20, 33)], CS2ValRel[,c(10, 20, 33)], CS2DataRelevant$Att, k=70)
-CS2ValRel$AttPred45<- results45
-confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred45))
-```
-
-```{r This part does not work for me}
 #Try with additional variables - does not improve accuracy over .8367
-#k = 34 (Square root of number of observations in training set) Overall Accuracy .8367
-results34 <- class::knn(CS2DataRelevant[,c(10, 13, 16, 20, 33)], CS2ValRel[,c(10, 13, 16, 20, 33)], CS2DataRelevant$Att, k=34)
-CS2ValRel$AttPred34 <- results34
-confusionMatrix(table(CS2ValRel$Attrition,CS2ValRel$AttPred34))
+#k = 3Plus (Square root of number of observations in training set) Overall Accuracy .8367
+results3Plus <- class::knn(DFTrainRel[,c(10, 13,  20, 33)], DFValRel[,c(10, 13, 20, 33)], DFTrainRel$Att, k=3)
+DFValRel$AttPred3Plus <- results3Plus
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred3Plus))
 
+#k = 1 Overall Accuracy 
+#Try different variables - remove overtime worked .7433
+results1 <- class::knn(DFTrainRel[,c(10, 33)], DFValRel[,c(10,  33)], DFTrainRel$Att, k=1)
+DFValRel$AttPred1 <- results1
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred1))
 
+#k = 1 Overall Accuracy 
+#Try different variables - add Job Involvement .74
+#Correctly predicted 7 yes
+results1 <- class::knn(DFTrainRel[,c(10, 13, 33)], DFValRel[,c(10, 13,  33)], DFTrainRel$Att, k=1)
+DFValRel$AttPred1 <- results1
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred1))
+
+#k = 3 Overall Accuracy 
+#Try different variables - add Job Involvement, increase k .83
+#Correctly predicted 1 yes
+results1 <- class::knn(DFTrainRel[,c(11, 14, 33)], DFValRel[,c(11, 14,  33)], DFTrainRel$Att, k=3)
+DFValRel$AttPred1 <- results1
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred1))
+
+#k = 3 Overall Accuracy 
+#Try different variables Envoironment Satisfaction, Hourly Rate, Years with Current Manager.8067
+#Correctly predict 4 yes
+results1 <- class::knn(DFTrainRel[,c(11, 13, 33)], DFValRel[,c(11, 13,  33)], DFTrainRel$Att, k=3)
+DFValRel$AttPred1 <- results1
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred1))
 ```
 
 ```{r}
-#knn Regression for Attrition - what does it look like when we make the prediction a conitnuous variable?
-#fit3 = knnreg(x = CS2DataRelevant[, c(10, 20, 33)], y = CS2DataRelevant$Att, k=3)
-#PredsTest3 <-predict(fit3, CS2Val[,c(12, 22, 38)])
-#ASETestAtt3 = sum((PredsTest3 - CS2Val$AttInt)^2)/(length(CS2Val$Att))
+#k = 3 Overall Accuracy 
+#Try different variables Envoironment Satisfaction, Hourly Rate, Years with Current Manager.8067
+#Correctly predict 4 yes
+TrainDF<- DFTrainRel
+ValDF <- DFValRel
+
+results1 <- class::knn(TrainDF[,c(10)], ValDF[,c(10)], TrainDF$Att, k=3)
+DFValRel$AttPred1 <- results1
+confusionMatrix(table(DFValRel$Attrition,DFValRel$AttPred1))
+```
 
 
-#Logistic Regression for Competition
-#create a dataset for prediction
 
 
-CS2LRModel <- data.frame(cbind(CS2DataRelevant$ID, CS2DataRelevant$Attrition, CS2DataRelevant$OverTime, CS2DataRelevant$EnvironmentSatisfaction, CS2DataRelevant$NumCompaniesWorked, CS2DataRelevant$JobInvolvement, CS2DataRelevant$BusinessTravel, CS2DataRelevant$YearsSinceLastPromotion, CS2DataRelevant$JobSatisfaction))
-CS2LRModel$Attrition <- CS2LRModel$Attrition - 1
+
+
+```{r Cross Validation model}
+resultsCV <- class::knn.cv(DFTrainRel[,c(10, 20, 33)],DFTrainRel$Att, k=1)
+DFTrainRel$AttPredCV <- resultsCV
+confusionMatrix(table(DFTrainRel$Attrition,DFTrainRel$AttPredCV))
+```
+
+```{r}
+##Logistic Regression for Competition
+#Turn Factors into integers 
+CS2DataRelevant$OTInt <- as.integer(CS2DataRelevant$OverTime)
+CS2DataRelevant$AttInt <- as.integer(CS2DataRelevant$Attrition)
+CS2ValRel$OTInt <- as.integer(CS2Val$OverTime)
+CS2Val$AttInt <- as.integer(CS2Val$Attrition)
+
+CS2LRModel <- data.frame(cbind(CS2DataRelevant$ID, CS2DataRelevant$Attrition, CS2DataRelevant$AttInt, CS2DataRelevant$OverTime, CS2DataRelevant$EnvironmentSatisfaction, CS2DataRelevant$NumCompaniesWorked, CS2DataRelevant$JobInvolvement, CS2DataRelevant$BusinessTravel, CS2DataRelevant$YearsSinceLastPromotion, CS2DataRelevant$JobSatisfaction))
+CS2LRModel$AttInt2 <- c(1)
+CS2LRModel$AttInt <- CS2LRModel$AttInt - CS2LRModel$AttInt2
 
 colnames(CS2LRModel) <- c('ID', 'Attrition', 'OverTime', 'EnvironmentSatisfaction', 'NumCompaniesWorked', 'JobInvolvement', 'BusinessTravel', 'YearsSinceLastPromotion', 'JobSatisfaction')
 
-model <- glm(formula = Attrition ~ ., family = binomial(link = "logit"), data = CS2LRModel)
+
+
+model <- glm(formula = AttInt ~ ., family = binomial(link = "logit"), data = CS2LRModel)
 summary(model)
 model <- glm(formula = Attrition ~  OverTime+EnvironmentSatisfaction + NumCompaniesWorked + JobInvolvement + BusinessTravel + YearsSinceLastPromotion + JobSatisfaction, family = binomial(link = "logit"), data = CS2LRModel)
 summary(model)
@@ -319,9 +310,198 @@ CS2LRModel <- CS2LRModel[,-7] #remove 'YearsSinceLastPromotion', 'JobSatisfactio
 
 model <- glm(formula = Attrition ~  OverTime+EnvironmentSatisfaction + NumCompaniesWorked + JobInvolvement , family = binomial(link = "logit"), data = CS2LRModel)
 summary(model)
+
+
+```
+
+```{r Naive Bayes with Categorical}
+#Assign Factors to Survey Responses
+#Responses <- c(1, 2, 3, 4)
+#StylesF <- c("American/Double/Iperial IPA","American Pale Ale (APA)", "American Amber / Red Ale", "American Amber / Red Ale", "American Blonde Ale", "American/Double/Iperial IPA", "American Pale Wheat Ale", "American Brown Ale", "American Porter", "Saison / Farmhouse Ale","Witbier")
+
+#BeerBreweries$FacStyle = factor(BeerBreweries$FacStyle, levels=Styles, labels = StylesF) #assign relevant styles
+#group small styles
+#BeerBreweries$FacStyle <- as.character(BeerBreweries$FacStyle)
+#BeerBreweries$FacStyle[!(BeerBreweries$FacStyle %in% StylesF)] = "Other"
+#BeerBreweries$FacStyle <- as.factor(BeerBreweries$FacStyle)
+
+#Set Survey Integers as Factors to run auto NB function
+#Create New Dataset to Play with
+DFTrainRelFacs <- DFTrainRel
+DFTrainRelFacs$Education <- as.factor(DFTrainRelFacs$Education)
+DFTrainRelFacs$EnvironmentSatisfaction <- as.factor(DFTrainRelFacs$EnvironmentSatisfaction)
+DFTrainRelFacs$JobInvolvement <- as.factor(DFTrainRelFacs$JobInvolvement)
+DFTrainRelFacs$JobLevel <- as.factor(DFTrainRelFacs$JobLevel)
+DFTrainRelFacs$JobSatisfaction <- as.factor(DFTrainRelFacs$JobSatisfaction)
+DFTrainRelFacs$NumCompaniesWorked <- as.factor(DFTrainRelFacs$NumCompaniesWorked)
+DFTrainRelFacs$PerformanceRating <- as.factor(DFTrainRelFacs$PerformanceRating)
+DFTrainRelFacs$RelationshipSatisfaction <- as.factor(DFTrainRelFacs$RelationshipSatisfaction)
+DFTrainRelFacs$StockOptionLevel <- as.factor(DFTrainRelFacs$StockOptionLevel)
+DFTrainRelFacs$TrainingTimesLastYear <- as.factor(DFTrainRelFacs$TrainingTimesLastYear)
+DFTrainRelFacs$WorkLifeBalance <- as.factor(DFTrainRelFacs$WorkLifeBalance)
+
+
+
+#Fitting the Naive Bayes model
+Naive_Bayes_Model=naiveBayes(Attrition ~., data=DFTrainRelFacs)
+#What does the model say? Print the model summary
+Naive_Bayes_Model
+
+
+DFTrainRelFacs$AttInt <- as.integer(DFTrainRelFacs$Attrition)
+DFTrainRelFacs$AttInt2 <- c(1)
+DFTrainRelFacs$AttInt <- DFTrainRelFacs$AttInt - DFTrainRelFacs$AttInt2
+model1 <- glm(formula = AttInt ~ ., family = binomial(link = "logit"), data = DFTrainRelFacs)
+summary(model1)
+
 ```
 
 
+
+```{r}
+#Percentage Analysis
+AttrY <- DFTrainRel[grep("Yes", DFTrainRel$Attrition), ]
+AttrN <- DFTrainRel[grep("No", DFTrainRel$Attrition), ]
+pAttrY <- dim(AttrY)[1] / (dim(AttrY)[1] + dim(AttrN)[1])
+pAttrN <- 1 - pAttrY
+
+#OverTime
+pOTYGivenAttY <- length(grep("Yes",AttrY$OverTime))/dim(AttrY)[1]
+pOTYGivenAttN <- length(grep("Yes",AttrN$OverTime))/dim(AttrN)[1]
+
+#Environment Satisfaction
+pES1GivenAttY <- length(grep(1,AttrY$EnvironmentSatisfaction))/dim(AttrY)[1]
+pES1GivenAttN <- length(grep(1,AttrN$EnvironmentSatisfaction))/dim(AttrN)[1]
+pES2GivenAttY <- length(grep(2,AttrY$EnvironmentSatisfaction))/dim(AttrY)[1]
+pES2GivenAttN <- length(grep(2,AttrN$EnvironmentSatisfaction))/dim(AttrN)[1]
+pES3GivenAttY <- length(grep(3,AttrY$EnvironmentSatisfaction))/dim(AttrY)[1]
+pES3GivenAttN <- length(grep(3,AttrN$EnvironmentSatisfaction))/dim(AttrN)[1]
+pES4GivenAttY <- length(grep(4,AttrY$EnvironmentSatisfaction))/dim(AttrY)[1]
+pES4GivenAttN <- length(grep(4,AttrN$EnvironmentSatisfaction))/dim(AttrN)[1]
+```
+
+
+####Two thousand four hundred and ten craft beers are produced within the United States.  We combine the Brewery and Beer data and then ordered by Beer ID.  As a result, the first six beers and last six beers each come from only two breweries total in table 2.
+```{r Merge Breweries and Beers dataframes by Brewery ID}
+BeerBreweries <- merge(x = Breweries, y = Beers, by.x=c("Brew_ID"), by.y =c("Brewery_id"), all=FALSE) #combine Breweries and Beers dataframes on their common column, Brewery_ID/Brew_ID
+#identical(nrow(Beers),nrow(BeerBreweries)) #confirm number of rows remains constant from Beers to Beer Breweries to verify merge
+colnames(BeerBreweries) <- c("BreweryID","BreweryName","City","State","StateName","BeerName","BeerID","ABV","IBU","Style","Ounces") #update column names for clarification
+BeerBreweries <- BeerBreweries[order(BeerBreweries$BeerID),]#order by Beer ID
+BBHead <- head(BeerBreweries, 6) #create dataframe of first 6 rows
+BBTail <- tail(BeerBreweries, 6) #create dataframe of last 6 rows
+BBGraph <- rbind(BBHead,BBTail) #combine dataframes for presentation
+BBGraph %>%
+  kable() %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+```
+
+
+####OLD BEER CODE IN CASE TO USE
+```{r get number of NAs in each column, include = TRUE}
+EmptyCols <- colSums(is.na(BeerBreweries)) #Count the number of NAs in each column
+EmptyCols <- EmptyCols[EmptyCols !=0] #Only report on columns that have NA values
+#EmptyCols %>%
+#  kable() %>%
+#  kable_styling(bootstrap_options = "striped", full_width = F, position = "left") #This information looks too strange in a table.  Pushing output to a sentence in writup.
+BeerBreweriesNA <- BeerBreweries[is.na(BeerBreweries$ABV == "NA"),]  #Everything with no ABV also has no IBU
+```
+
+
+```{r Size of Breweries}
+BeerCount <- data.frame(sort(table(BeerBreweries$BreweryName), decreasing=TRUE))#how many beers do these breweries produce
+colnames(BeerCount)<- c("BreweryName", "NumberOfBeers") #assign column names for output
+SumBeers <- summary(BeerCount$NumberOfBeers)
+#SumBeers <- round(SumBeers, digits = 1)
+# median 3, mean 4.4, min 1, max 62
+ggplot(BeerCount, aes(x=1, y=NumberOfBeers)) + geom_boxplot() + scale_x_continuous(breaks=NULL) + theme(axis.title.x = element_blank())+ ggtitle("Summary Statistics: Number of Beers Produced by Brewery, fig. 2")
+```
+
+
+##Craft Beer Styles
+```{r Brew Style Analysis}
+BeerBreweries$FacStyle <- BeerBreweries$Style
+#Assign meaning style factors only if beers of that style > 50, all others assigned to other
+#10 style > 50, 90 styles <50
+Styles <- c("American IPA","American Pale Ale (APA)", "American Amber / Red Ale", "American Amber / Red Lager", "American Blonde Ale", "American Double / Imperial IPA", "American Pale Wheat Ale", "American Brown Ale", "American Porter", "Saison / Farmhouse Ale","Witbier")
+StylesF <- c("American/Double/Iperial IPA","American Pale Ale (APA)", "American Amber / Red Ale", "American Amber / Red Ale", "American Blonde Ale", "American/Double/Iperial IPA", "American Pale Wheat Ale", "American Brown Ale", "American Porter", "Saison / Farmhouse Ale","Witbier")
+
+BeerBreweries$FacStyle = factor(BeerBreweries$FacStyle, levels=Styles, labels = StylesF) #assign relevant styles
+#group small styles
+BeerBreweries$FacStyle <- as.character(BeerBreweries$FacStyle)
+BeerBreweries$FacStyle[!(BeerBreweries$FacStyle %in% StylesF)] = "Other"
+BeerBreweries$FacStyle <- as.factor(BeerBreweries$FacStyle)
+
+StyleCount <- data.frame(sort(table(BeerBreweries$FacStyle), decreasing=TRUE))
+colnames(StyleCount)<- c("Style", "NumberOfBeers")
+#SumStyles <- summary(StyleCount$NumberOfBeers)
+#SumStyles <- round(SumStyles, digits = 1)
+
+ggplot(StyleCount, aes(Style, NumberOfBeers, fill=Style)) + geom_bar(stat = "identity") + ggtitle("Total Beers Produced by Style, fig. 3") + theme(legend.position = "none", axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5)) + ylab("Total Beers by Style")
+```
+
+
+####An IPA is defined in part by higher IBU.  We separated the data with IBU into IPA Varietals and Non 
+```{r IBU Comparison between IPA and Other Varieties}
+BigIPA <- BeerBreweries[grep("IPA|India", BeerBreweries$Style), ]#IPA only - 574 total, 395 have IBU data
+IPAwIBU <- BigIPA[!is.na(BigIPA$IBU),]#remove observations that don't have IBU data
+h <- ggplot(IPAwIBU, aes(x=IBU)) + geom_histogram(position = "identity")
+h + geom_histogram(position = "identity", binwidth = 8, fill="yellow", colour = "red")+ ggtitle("IBU Distribution for IPA Varietals, fig. 4")
+OtherBeers <- BeerBreweries[-grep("IPA|India", BeerBreweries$Style), ] #all non-IPA beers into one list
+OtherBeers <- OtherBeers[!is.na(OtherBeers$IBU),]#remove observations that don't have IBU data
+j <- ggplot(OtherBeers, aes(x=IBU)) + geom_histogram(position = "identity")
+j + geom_histogram(position = "identity", binwidth = 8, fill="yellow", colour = "red")+ ggtitle("IBU Distribution for non-IPA Varietals, fig 5")
+```
+
+
+###ABV-IBU Relationship
+```{r IBU ABV Correlation}
+BeerBreweriesNoNA <- BeerBreweries[!is.na(BeerBreweries$IBU == "NA"),]
+ggplot(BeerBreweriesNoNA, aes(ABV, IBU)) + geom_point() + ggtitle("IBU - ABV Correlation, fig. 6")
+ABVIBU <-cor(Beers$ABV, Beers$IBU, use = "complete.obs") #get correlation of ABV IBU
+```
+
+
+#ABV-IBU Across the Country
+```{r Create Barcharts of IBU and ABV by State}
+#create vectors of medians by state for measurements of interest ABV and IBU
+attach(BeerBreweries) #attaching dataset here alleviates errors
+ABVMedians <- aggregate(ABV ~ StateName, data=BeerBreweries, median) #calculate median ABV by state
+IBUMedians <- aggregate(IBU ~ StateName, data=BeerBreweries, median) #calculate median IBU by state
+#ordered Barchart of Median Alcohol Content by State
+ggplot2::ggplot(ABVMedians, aes(x=reorder(StateName, -ABV), y=ABV, fill=StateName)) + geom_bar(stat = "identity") + ggtitle("Median Alcohol by Volume by State, fig. 7") + theme(legend.position = "none", axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5)) + xlab("State") + ylab("Median ABV")
+#+ scale_fill_hue(l=40, c=100)
+#ordered Barchart of Median Bitterness by State
+ggplot2::ggplot(IBUMedians, aes(x=reorder(StateName, -IBU), y=IBU, fill=StateName)) + geom_bar(stat = "identity") + ggtitle("Median IBU by Volume by State, fig. 8") + theme(legend.position = "none", axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5)) + xlab("State") + ylab("Median IBU") 
+#+ scale_fill_hue(l=40, c=100)
+
+IBUMedians$StateName <- as.character(IBUMedians$StateName)#convert state name column to character for which.max
+ABVMedians$StateName <- as.character(ABVMedians$StateName)#convert state name column to character for which.max
+StateMaxMedABV <- ABVMedians$StateName[which.max(ABVMedians$MedianABVPC)]#get the state with the highest median ABV
+StateMaxMedIBU <- IBUMedians$StateName[which.max(IBUMedians$MedianIBU)]#get the state with the highest median IBU
+BeerBreweries$StateName <- as.character(BeerBreweries$StateName)#convert state name column to character for which.max
+StateMaxABV <- BeerBreweries$StateName[which.max(BeerBreweries$ABV)]#get the state that produces the beers with the highest individua ABV
+StateMaxIBU <- BeerBreweries$StateName[which.max(BeerBreweries$IBU)]#get the state that produces the beers with the highest individual IBU
+```
+
+
+###Summary Statistics for Alcohol by Volume (ABV)
+####Digging into ABV, Beers in our study range in ABV from 0.1% to 12.8%, with 75% of beers falling between 5% and 6.7%.  The median ABV for the beers in our study is 5.6% and the mean is 6.0%
+```{r Summary statistics for ABV}
+#summary statistics for ABV Alcohol by Volume
+SummaryABV <- summary(BeerBreweries$ABV)
+BeerBreweriesNoNA <- BeerBreweries[!is.na(BeerBreweries$ABV == "NA"),]
+ggplot(BeerBreweriesNoNA, aes(x=1, y=ABV)) + geom_boxplot() + scale_x_continuous(breaks=NULL) + theme(axis.title.x = element_blank())+ ggtitle("Summary Statistics: Alcohol by Volume, fig. 9")
+```
+
+
+###Recommendations Summary
+####To recap the opportunities, the American  market devours IPA. A-B needs to expand its taste portfolio like its competitors, there are many craft breweries producing beers that could compliment our portfolio of offerings and set us up to create new, non-alcoholic offerings with our ZERO process.
+
+
+
+#### Other References 
+###Youtube PowerPoint Presentation
+#### https://youtu.be/X7wWLbDmeDM
 ###Github Respository
 ####https://github.com/NicoleABartholow/MSDS6306CaseStudy2
 

@@ -18,6 +18,7 @@ library(grid)
 library(mlr)
 library(caret)
 library(e1071)
+library(AppliedPredictiveModeling)
 ```
 
 #Introduction
@@ -159,6 +160,13 @@ ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = YearsWithCurrManager)
   geom_boxplot()
 ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = OverTime)) +
   geom_boxplot()
+
+
+featurePlot(x = iris[, 1:4], 
+            y = iris$Species, 
+            plot = "pairs",
+            ## Add a key at the top
+            auto.key = list(columns = 3))
 ```
 
 
@@ -169,10 +177,16 @@ DFTrainFS <- cbind.data.frame(DFTrainRel$ID, DFTrainRel$BusinessTravel, DFTrainR
 
 DFValFS <- cbind.data.frame(DFValRel$ID, DFValRel$BusinessTravel, DFValRel$Department, DFValRel$Education, DFValRel$EducationField, DFValRel$EnvironmentSatisfaction, DFValRel$Gender, DFValRel$HourlyRate, DFValRel$JobInvolvement, DFValRel$JobLevel, DFValRel$JobRole, DFValRel$JobSatisfaction, DFValRel$MaritalStatus, DFValRel$MonthlyRate, DFValRel$NumCompaniesWorked, DFValRel$OverTime, DFValRel$PercentSalaryHike, DFValRel$PerformanceRating, DFValRel$RelationshipSatisfaction, DFValRel$StockOptionLevel, DFValRel$TotalWorkingYears, DFValRel$TrainingTimesLastYear, DFValRel$WorkLifeBalance, DFValRel$YearsAtCompany, DFValRel$YearsSinceLastPromotion, DFValRel$YearsWithCurrManager, DFValRel$YearsInCurrentRole )
 
-TrainAttrition <- as.integer(DFTrainRel$Attrition)-1
-TestAttrition <- as.integer(DFValRel$Attrition)-1
+#TrainAttrition <- as.integer(DFTrainRel$Attrition)-1
+#TestAttrition <- as.integer(DFValRel$Attrition)-1
 
-rfe(x=DFTrainRelFS, y=TrainAttrition, sizes = (2:27), metric = "Accuracy" , rfeControl = nbFuncs, testx = DFValFS, testy = TestAttrition)
+TrainAttrition <- DFTrainRel$Attrition
+TestAttrition <- DFValRel$Attrition
+
+
+ctrl <- rfeControl(functions = nbFuncs)
+
+rfe(x=DFTrainRelFS, y=TrainAttrition, sizes = 2^(2:27), metric = "Accuracy" , rfeControl = ctrl, testx = DFValFS, testy = TestAttrition)
 
 
 ```
@@ -180,15 +194,6 @@ rfe(x=DFTrainRelFS, y=TrainAttrition, sizes = (2:27), metric = "Accuracy" , rfeC
 
 
 ```{r Naive Bayes with Categorical}
-#Assign Factors to Survey Responses
-#Responses <- c(1, 2, 3, 4)
-#StylesF <- c("American/Double/Iperial IPA","American Pale Ale (APA)", "American Amber / Red Ale", "American Amber / Red Ale", "American Blonde Ale", "American/Double/Iperial IPA", "American Pale Wheat Ale", "American Brown Ale", "American Porter", "Saison / Farmhouse Ale","Witbier")
-
-#BeerBreweries$FacStyle = factor(BeerBreweries$FacStyle, levels=Styles, labels = StylesF) #assign relevant styles
-#group small styles
-#BeerBreweries$FacStyle <- as.character(BeerBreweries$FacStyle)
-#BeerBreweries$FacStyle[!(BeerBreweries$FacStyle %in% StylesF)] = "Other"
-#BeerBreweries$FacStyle <- as.factor(BeerBreweries$FacStyle)
 
 #Set Survey Integers as Factors to run auto NB function
 #Create New Dataset to Play with
@@ -374,7 +379,7 @@ CS2LRModel <- data.frame(cbind(CS2DataRelevant$ID, CS2DataRelevant$Attrition, CS
 CS2LRModel$AttInt2 <- c(1)
 CS2LRModel$AttInt <- CS2LRModel$AttInt - CS2LRModel$AttInt2
 
-colnames(CS2LRModel) <- c('ID', 'Attrition', 'OverTime', 'EnvironmentSatisfaction', 'NumCompaniesWorked', 'JobInvolvement', 'BusinessTravel', 'YearsSinceLastPromotion', 'JobSatisfaction')
+colnames(CS2LRModel) <- c('ID', 'Attrition', 'AttInt', 'OverTime', 'EnvironmentSatisfaction', 'NumCompaniesWorked', 'JobInvolvement', 'BusinessTravel', 'YearsSinceLastPromotion', 'JobSatisfaction')
 
 
 

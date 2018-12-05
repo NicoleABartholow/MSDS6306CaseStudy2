@@ -19,6 +19,8 @@ library(mlr)
 library(caret)
 library(e1071)
 library(AppliedPredictiveModeling)
+library(FSelector)
+library(GGally)
 ```
 
 #Introduction
@@ -161,12 +163,25 @@ ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = YearsWithCurrManager)
 ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = OverTime)) +
   geom_boxplot()
 
+DFTrainCorr <- cbind.data.frame(DFTrainRel$Attrition, DFTrainRel$EnvironmentSatisfaction, DFTrainRel$JobInvolvement, DFTrainRel$JobLevel, DFTrainRel$JobRole, DFTrainRel$JobSatisfaction, DFTrainRel$PerformanceRating, DFTrainRel$RelationshipSatisfaction, DFTrainRel$StockOptionLevel, DFTrainRel$WorkLifeBalance)
 
-featurePlot(x = iris[, 1:4], 
-            y = iris$Species, 
-            plot = "pairs",
-            ## Add a key at the top
-            auto.key = list(columns = 3))
+#not working
+#featurePlot(x = DFTrainCorr[, 2:5], y = DFTrainCorr$Attrition, plot = "pairs",
+            ## Add a key at the top auto.key = list(columns = 3))
+
+DFTrain %>%
+  filter(Attrition == "Yes") %>%
+  select_if(is.numeric) %>%
+  cor() %>%
+  corrplot::corrplot()
+
+DFTrain %>%
+  filter(Attrition == "No") %>%
+  select_if(is.numeric) %>%
+  cor() %>%
+  corrplot::corrplot()
+
+
 ```
 
 
@@ -186,18 +201,58 @@ TestAttrition <- DFValRel$Attrition
 
 ctrl <- rfeControl(functions = nbFuncs)
 
-rfe(x=DFTrainRelFS, y=TrainAttrition, sizes = 2^(2:27), metric = "Accuracy" , rfeControl = ctrl, testx = DFValFS, testy = TestAttrition)
+rfe1 <- rfe(x=DFTrainRelFS, y=TrainAttrition, sizes = 2^(2:27), metric = "Accuracy" , rfeControl = ctrl, testx = DFValFS, testy = TestAttrition)
+#top5 - DFTrainRel$OverTime, DFTrainRel$TotalWorkingYears, DFTrainRel$YearsAtCompany, DFTrainRel$MaritalStatus, DFTrainRel$YearsInCurrentRole
+#Variables Accuracy  Kappa AccuracySD KappaSD Selected
+#         4   0.8282 0.1955    0.02308 0.07625         
+#         8   0.8326 0.2846    0.02641 0.04974         
+#        16   0.8509 0.2403    0.01554 0.06693        *
+#        27   0.8498 0.1529    0.01489 0.08675     
+        
+rfe2 <- rfe(x=DFTrainRelFS, y=TrainAttrition, sizes = 2^(2:27), metric = "Accuracy" , rfeControl = ctrl, testx = DFValFS)
+#top5 - DFTrainRel$OverTime, DFTrainRel$TotalWorkingYears, DFTrainRel$YearsAtCompany, DFTrainRel$StockOptionLevel, DFTrainRel$MaritalStatus
+#Variables Accuracy  Kappa AccuracySD KappaSD Selected
+#         4   0.8339 0.2035    0.01486 0.07075         
+#         8   0.8353 0.2942    0.01807 0.06181         
+#        16   0.8609 0.2873    0.01107 0.06562        *
+#        27   0.8553 0.1725    0.01195 0.06204
+
+rfe3 <- rfe(x=DFTrainRelFS, y=TrainAttrition, sizes = 2^(2:27), metric = "Accuracy" , rfeControl = ctrl)
+#top5 - DFTrainRel$OverTime, DFTrainRel$YearsAtCompany, DFTrainRel$YearsInCurrentRole, DFTrainRel$TotalWorkingYears, DFTrainRel$MaritalStatus
+#Variables Accuracy  Kappa AccuracySD KappaSD Selected
+#         4   0.8310 0.1910    0.02215 0.07589         
+#         8   0.8381 0.2837    0.02019 0.06147         
+#        16   0.8579 0.2638    0.01753 0.07909        *
+#        27   0.8499 0.1517    0.01690 0.06859     
+
+
 
 
 ```
 
 
 
-```{r Naive Bayes with Categorical}
+```{r Naive Bayes}
+Naive_Bayes_Model <- naiveBayes(Attrition ~ ., data = DFTrainRel)
+
+Naive_Bayes_Model
+
+NB_Prediction <- predict(Naive_Bayes_Model, DFTrainRel)
+
+table(NB_Prediction,DFTrainRel$Attrition)
+
+test_data <- read.csv('Desktop/NB_NB/CaseStudy2Validation.csv')
+
+NB_Test <- predict(Naive_Bayes_Model, DFValRel)
+
+confusionMatrix(table(NB_Test,DFValRel$Attrition))
+
+```
+
 
 #Set Survey Integers as Factors to run auto NB function
 #Create New Dataset to Play with
-DFTrainRelFacs <- DFTrainRel
+```{r} DFTrainRelFacs <- DFTrainRel
 DFTrainRelFacs$Education <- as.factor(DFTrainRelFacs$Education)
 DFTrainRelFacs$EnvironmentSatisfaction <- as.factor(DFTrainRelFacs$EnvironmentSatisfaction)
 DFTrainRelFacs$JobInvolvement <- as.factor(DFTrainRelFacs$JobInvolvement)

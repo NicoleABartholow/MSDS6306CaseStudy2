@@ -236,7 +236,7 @@ table(NB_Test,DFValRel$Attrition)
 
 ```
 
-```{r rte}
+```{r rfe}
 
 ###Code used to identify 5 best parameters to use when applying Naive Bayes. Take time and processing power. 
 
@@ -349,7 +349,6 @@ New_Naive_Bayes_Model <- naiveBayes(Attrition ~ OverTime + YearsInCurrentRole + 
 
 New_Naive_Bayes_Model
 
-
 New_NB_Prediction <- predict(New_Naive_Bayes_Model, training_data[,c('OverTime','YearsInCurrentRole','StockOptionLevel','YearsAtCompany','TotalWorkingYears')])
 
 confusionMatrix(table(New_NB_Prediction,training_data$Attrition))
@@ -365,13 +364,26 @@ table(New_NB_Prediction,training_data$Attrition)
 table(New_NB_Prediction2,training_data$Attrition)
 
 test_data <- DFTest[,-1] #Eliminate ID
-Test_Data_NB <- naiveBayes(Attrition ~ OverTime + TotalWorkingYears + YearsAtCompany + StockOptionLevel + MaritalStatus, data = test_data)
+Test_Data_NB <- naiveBayes(Attrition ~ OverTime + YearsInCurrentRole + StockOptionLevel + YearsAtCompany + TotalWorkingYears, data = test_data)
 
 Test_Data_NB
-Test_Data_NB_Pred <- predict(Test_Data_NB, test_data[,c('OverTime','TotalWorkingYears','YearsAtCompany','StockOptionLevel','MaritalStatus')])
+Test_Data_NB_Pred <- predict(Test_Data_NB, test_data[,c('OverTime','YearsInCurrentRole','StockOptionLevel','YearsAtCompany', 'TotalWorkingYears')])
+
+
+
+Test_Data_NB2 <- naiveBayes(Attrition ~ OverTime + TotalWorkingYears + YearsAtCompany + StockOptionLevel + MaritalStatus, data = test_data)
+
+Test_Data_NB2
+
+Test_Data_NB_Pred2 <- predict(Test_Data_NB2, test_data[,c('OverTime','TotalWorkingYears','YearsAtCompany','StockOptionLevel','MaritalStatus')])
+
+
 
 ### By using Naive Bayes and specifically looking at OverTime, Total Working Years, Years at the Company, Stock Option Level, and Marital Status we can determine with 60% accuracy attrition as yes or no.
+
 confusionMatrix(table(Test_Data_NB_Pred,test_data$Attrition))
+
+confusionMatrix(table(Test_Data_NB_Pred2,test_data$Attrition))
 
 ```
 

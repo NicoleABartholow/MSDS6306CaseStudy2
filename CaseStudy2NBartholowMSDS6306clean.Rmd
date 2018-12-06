@@ -8,8 +8,8 @@ output: pdf_document
 ```{r Setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 library(DataExplorer)
-library(dplyr)
 library(plyr)
+library(dplyr)
 library(ggplot2)
 library(openintro)
 library(reshape2)
@@ -19,8 +19,8 @@ library(mlr)
 library(caret)
 library(e1071)
 library(AppliedPredictiveModeling)
-library(FSelector)
 library(GGally)
+library(corrplot)
 ```
 
 #Introduction
@@ -30,13 +30,19 @@ library(GGally)
 
 
 ####First we bring in the data provided and clean it up for analysis.  
-```{r Read Breweries and read Beers files into dataframes}
+```{r Read Attrition Data}
 #set working directory for local computer
 #REPRODUCIBLE TIP - CHANGE THIS WORKING DIRECTORY FOR YOUR REPRODUCTION ENVIRONMENT
-setwd("/Users/nicolealphin/Desktop/DataScience/MSDS6306-DoingDataScience/HW/CaseStudy2")
-DFTrain <- read.csv("./Analysis/Data/CaseStudy2-data.csv", header=TRUE) #import HR Data into DFTrain dataframe
-DFVal <- read.csv("./Analysis/Data/CaseStudy2Validation.csv", header=TRUE) #import HR Validation Set into DFVal dataframe
+
+PATH <- "/Users/Chase/Desktop/MSDS/CaseStudy2data.csv"
+PATH2 <- "/Users/Chase/Desktop/MSDS/CaseStudy2Validation.csv"
+
+
+DFTrain <- read.csv(PATH, header = TRUE) #import HR Data into CS2Data dataframe
+DFTest <- read.csv(PATH2, header = TRUE) #import HR Validation Set into CS2Val dataframe
+
 ```
+
 
 #Analysis of missing/unneccesary data
 ```{r}
@@ -53,7 +59,7 @@ DFTrainRel <- DFTrainRel[,-34] #remove Rand
 DFTrainRel <- DFTrainRel[,-10] #remove Employee Number
 
 #Make test and train the same
-DFValRel <- DFVal[,-10] #remove Employee Count
+DFValRel <- DFTest[,-10] #remove Employee Count
 DFValRel <- DFValRel[,-22] #remove Over18
 DFValRel <- DFValRel[,-26] #remove StandardHours
 DFValRel <- DFValRel[,-34] #remove Rand
@@ -77,10 +83,10 @@ g3 <- ggplot(DFTrainRel, aes(x = HourlyRate, fill = Attrition)) + geom_density(a
 g4 <- ggplot(DFTrainRel, aes(x = DailyRate, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
 OTg <- ggplot(DFTrainRel, aes(x = OTInt, fill = Attrition)) + geom_density(alpha = 0.5) + scale_fill_manual(values = c("#386cb0", "#fdb462"))
 ## Box Plot of Job Roles compared to OT grouped by Attrition 
-DFTrainRel$OTInt <- as.integer(DFTrainRel$OverTime)
-OTg2 <- ggplot(DFTrainRel, aes(x = JobRole, y = OTInt, fill = Attrition)) + geom_bar(stat = "identity") + scale_fill_manual(values = c("#386cb0", "#ffa500")) + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + coord_flip()
+##DFTrainRel$OTInt <- as.integer(DFTrainRel$OverTime)
+###OTg2 <- ggplot(DFTrainRel, aes(x = JobRole, y = OTInt, fill = Attrition)) + geom_bar(stat = "identity") + scale_fill_manual(values = c("#386cb0", "#ffa500")) + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + coord_flip()
 
-grid.arrange(g1, g2, g3, g4, OTg, OTg2, ncol = 2, nrow = 3)
+grid.arrange(g1, g2, g3, g4, ncol = 2, nrow = 2)
 ```
 
 ```{r Attrition More Graphs}
@@ -108,8 +114,8 @@ grid.arrange(g5, g6, ncol = 2, nrow = 1)
 
 #Boxplots
 ```{r Plots}
-plot_str(CS2Data)
-plot_histogram(CS2Data)
+plot_str(DFTrainRel)
+plot_histogram(DFTrainRel)
 
 #Boxplots of each continuous variable against Attrition
 ggplot(data = DFTrainRel, mapping = aes(x = Attrition, y = Age)) +
@@ -201,7 +207,7 @@ TestAttrition <- DFValRel$Attrition
 
 ctrl <- rfeControl(functions = nbFuncs)
 
-rfe1 <- rfe(x=DFTrainRelFS, y=TrainAttrition, sizes = 2^(2:27), metric = "Accuracy" , rfeControl = ctrl, testx = DFValFS, testy = TestAttrition)
+rfe1 <- rfe(x=DFTrainFS, y=TrainAttrition, sizes = c(2,5), maxit = 10, metric = "Accuracy" , rfeControl = ctrl, testx = DFValFS, testy = TestAttrition)
 #top5 - DFTrainRel$OverTime, DFTrainRel$TotalWorkingYears, DFTrainRel$YearsAtCompany, DFTrainRel$MaritalStatus, DFTrainRel$YearsInCurrentRole
 #Variables Accuracy  Kappa AccuracySD KappaSD Selected
 #         4   0.8282 0.1955    0.02308 0.07625         
@@ -209,25 +215,6 @@ rfe1 <- rfe(x=DFTrainRelFS, y=TrainAttrition, sizes = 2^(2:27), metric = "Accura
 #        16   0.8509 0.2403    0.01554 0.06693        *
 #        27   0.8498 0.1529    0.01489 0.08675     
         
-rfe2 <- rfe(x=DFTrainRelFS, y=TrainAttrition, sizes = 2^(2:27), metric = "Accuracy" , rfeControl = ctrl, testx = DFValFS)
-#top5 - DFTrainRel$OverTime, DFTrainRel$TotalWorkingYears, DFTrainRel$YearsAtCompany, DFTrainRel$StockOptionLevel, DFTrainRel$MaritalStatus
-#Variables Accuracy  Kappa AccuracySD KappaSD Selected
-#         4   0.8339 0.2035    0.01486 0.07075         
-#         8   0.8353 0.2942    0.01807 0.06181         
-#        16   0.8609 0.2873    0.01107 0.06562        *
-#        27   0.8553 0.1725    0.01195 0.06204
-
-rfe3 <- rfe(x=DFTrainRelFS, y=TrainAttrition, sizes = 2^(2:27), metric = "Accuracy" , rfeControl = ctrl)
-#top5 - DFTrainRel$OverTime, DFTrainRel$YearsAtCompany, DFTrainRel$YearsInCurrentRole, DFTrainRel$TotalWorkingYears, DFTrainRel$MaritalStatus
-#Variables Accuracy  Kappa AccuracySD KappaSD Selected
-#         4   0.8310 0.1910    0.02215 0.07589         
-#         8   0.8381 0.2837    0.02019 0.06147         
-#        16   0.8579 0.2638    0.01753 0.07909        *
-#        27   0.8499 0.1517    0.01690 0.06859     
-
-
-
-
 ```
 
 
@@ -241,18 +228,158 @@ NB_Prediction <- predict(Naive_Bayes_Model, DFTrainRel)
 
 table(NB_Prediction,DFTrainRel$Attrition)
 
-test_data <- read.csv('Desktop/NB_NB/CaseStudy2Validation.csv')
-
 NB_Test <- predict(Naive_Bayes_Model, DFValRel)
 
-confusionMatrix(table(NB_Test,DFValRel$Attrition))
+table(NB_Test,DFValRel$Attrition)
+
+
+
+```
+
+```{r rte}
+
+###Code used to identify 5 best parameters to use when applying Naive Bayes. Take time and processing power. 
+
+#####THIS IS THE BEST PART
+a <- rfe(x=DFTrainFS, y=TrainAttrition, sizes = c(2,5), maxit = 10, metric = "Accuracy" , rfeControl = ctrl, testx = DFValFS)
+#top5 - DFTrainRel$OverTime, DFTrainRel$TotalWorkingYears, DFTrainRel$YearsAtCompany, DFTrainRel$StockOptionLevel, DFTrainRel$MaritalStatus
+#Variables Accuracy  Kappa AccuracySD KappaSD Selected
+#         4   0.8339 0.2035    0.01486 0.07075         
+#         8   0.8353 0.2942    0.01807 0.06181         
+#        16   0.8609 0.2873    0.01107 0.06562        *
+#        27   0.8553 0.1725    0.01195 0.06204
+
+
+```
+
+```{r NB}
+
+###Refining of original Naive Bayes
+
+training_data<- DFTrain
+
+training_data <- training_data[,-1] #ID
+
+Naive_Bayes_Model <- naiveBayes(Attrition ~ ., data = training_data)
+
+Naive_Bayes_Model
+
+NB_Prediction <- predict(Naive_Bayes_Model, training_data)
+
+table(NB_Prediction,training_data$Attrition)
+
+test_data <- DFTest
+
+NB_Test <- predict(Naive_Bayes_Model, test_data)
+
+table(NB_Test,test_data$Attrition)
+
+lapply(training_data, summary)
+#remove Over18 PerformanceRating StandardHours
+
+training_data[,c('Over18','PerformanceRating','StandardHours','EmployeeNumber','EmployeeCount')] <- NULL
+
+# ggpairs(training_data[c(1,4,6,11,17,18,21,24,27:31)])
+#no multicolinearity in our continuous variables
+
+
+training_data[c(24,27:30)]<- NULL #YEARS Variables
+
+training_data[c(7,9,12,13,15,19,22:24)]<- lapply(training_data[c(7,9,12,13,15,19,22:24)], as.factor)
+
+training_data[c(3,5,7,8,9,10,12,13,14,15,16,19,20,22:24)]<- lapply(training_data[c(3,5,7,8,9,10,12,13,14,15,16,19,20,22:24)], as.integer)
+
+# chisq.test(training_data[c(3,5,7,8,9,10,12,13,14,15,16,19,20,22:24)])
+
+chisq.test(training_data[,c(5,7,8,9,10,12,13,14,15,16,19,20,22:24)],training_data[,3])
+
+ggpairs(training_data[c(5,7,8,9,10,12,13,14,15,16,19,20,22:24)])
+
+##corrplot(training_data[c(5,7,8,9,10,12,13,14,15,16,19,20,22:24)], method = 'number')
+
+training_data <- training_data[,-26]
+
+training_data <- training_data[,-c(4,17,18)]
+
+New_Naive_Bayes_Model <- naiveBayes(Attrition ~ ., data = training_data)
+
+New_Naive_Bayes_Model
+
+New_NB_Prediction <- predict(New_Naive_Bayes_Model, training_data)
+
+table(New_NB_Prediction,training_data$Attrition)
+
+test_data <- test_data[,-1] #ID
+
+test_data[,c('Over18','PerformanceRating','StandardHours','EmployeeNumber','EmployeeCount')] <- NULL
+
+test_data[c(24,27:30)]<- NULL #YEARS Variables
+
+test_data[c(7,9,12,13,15,19,22:24)]<- lapply(test_data[c(7,9,12,13,15,19,22:24)], as.factor)
+# 
+test_data[c(3,5,7,8,9,10,12,13,14,15,16,19,20,22:24)]<- lapply(test_data[c(3,5,7,8,9,10,12,13,14,15,16,19,20,22:24)], as.integer)
+
+test_data <- test_data[,-26]
+
+ctrl <- rfeControl(functions = nbFuncs)
+
+Attrition <- as.vector(
+  as.numeric(
+    as.factor(training_data$Attrition)))
+
+# rfe(x=as.matrix(training_data[,c(1,3:25)]),
+#     y=Attrition,
+#     sizes =c(2:10), metric = 'RMSE', 
+#     maximize = T, 
+#     testX= test_data[c(1,3:25)],
+#     testY=training_data$Attrition,
+#     rfeControl = ctrl, size = 5)
+
+# DFTrainRel$OverTime, 
+# DFTrainRel$TotalWorkingYears, 
+# DFTrainRel$YearsAtCompany, 
+# DFTrainRel$StockOptionLevel, 
+# DFTrainRel$MaritalStatus
+
+training_data<- DFTrain
+
+training_data <- training_data[,-1] #ID
+
+New_Naive_Bayes_Model <- naiveBayes(Attrition ~ OverTime + YearsInCurrentRole + StockOptionLevel + YearsAtCompany + TotalWorkingYears,data = training_data)
+
+New_Naive_Bayes_Model
+
+
+New_NB_Prediction <- predict(New_Naive_Bayes_Model, training_data[,c('OverTime','YearsInCurrentRole','StockOptionLevel','YearsAtCompany','TotalWorkingYears')])
+
+confusionMatrix(table(New_NB_Prediction,training_data$Attrition))
+
+New_Naive_Bayes_Model2 <- naiveBayes(Attrition ~ OverTime + TotalWorkingYears + YearsAtCompany + StockOptionLevel + MaritalStatus, data = training_data)
+
+New_Naive_Bayes_Model
+New_Naive_Bayes_Model2
+
+New_NB_Prediction2 <- predict(New_Naive_Bayes_Model2, training_data[,c('OverTime','TotalWorkingYears','YearsAtCompany','StockOptionLevel','MaritalStatus')])
+
+table(New_NB_Prediction,training_data$Attrition)
+table(New_NB_Prediction2,training_data$Attrition)
+
+test_data <- DFTest[,-1] #Eliminate ID
+Test_Data_NB <- naiveBayes(Attrition ~ OverTime + TotalWorkingYears + YearsAtCompany + StockOptionLevel + MaritalStatus, data = test_data)
+
+Test_Data_NB
+Test_Data_NB_Pred <- predict(Test_Data_NB, test_data[,c('OverTime','TotalWorkingYears','YearsAtCompany','StockOptionLevel','MaritalStatus')])
+
+### By using Naive Bayes and specifically looking at OverTime, Total Working Years, Years at the Company, Stock Option Level, and Marital Status we can determine with 60% accuracy attrition as yes or no.
+confusionMatrix(table(Test_Data_NB_Pred,test_data$Attrition))
 
 ```
 
 
 #Set Survey Integers as Factors to run auto NB function
 #Create New Dataset to Play with
-```{r} DFTrainRelFacs <- DFTrainRel
+```{r} 
+DFTrainRelFacs <- DFTrainRel
 DFTrainRelFacs$Education <- as.factor(DFTrainRelFacs$Education)
 DFTrainRelFacs$EnvironmentSatisfaction <- as.factor(DFTrainRelFacs$EnvironmentSatisfaction)
 DFTrainRelFacs$JobInvolvement <- as.factor(DFTrainRelFacs$JobInvolvement)

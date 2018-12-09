@@ -36,10 +36,13 @@ library(corrplot)
 ####We were provided with a snapshot Sierra associates in two separate data files of 1470 Sierra associates total.  While we have Attrition status for all associates, we used the population of 1170 employees to create a model.  We then test that model to predict the Attrition status of the other 300.   For initial evaluation, we removed columns that were meaningless to attrition analysis either because they were not environmental or because they had no variation in value across the dataset. These columns are ID, Employee Count, Employee Number, Over 18, Standard Hours, and Rand.  
 ####On the whole, the model reflected a 16.1% attrition rate, but it is not clear over what time period.  
 ```{r Read Attrition Data Files}
-#set working directory for local computer
-setwd("/Users/nicolealphin/Desktop/DataScience/MSDS6306-DoingDataScience/HW/CaseStudy2")
-DFTrain <- read.csv("./Analysis/Data/CaseStudy2-data.csv", header=TRUE) #import HR Data into DFTrain dataframe
-DFTest <- read.csv("./Analysis/Data/CaseStudy2Validation.csv", header=TRUE) #import HR Validation Set into DFVal dataframe
+PATH <- "/Users/Chase/Desktop/MSDS/CaseStudy2data.csv"
+PATH2 <- "/Users/Chase/Desktop/MSDS/CaseStudy2Validation.csv"
+
+
+DFTrain <- read.csv(PATH, header = TRUE) #import HR Data into CS2Data dataframe
+DFTest <- read.csv(PATH2, header = TRUE) #import HR Validation Set into CS2Val dataframe
+
 
 #Remove columns that are irrelevant or have only one value
 # No information was provided for Rand, but it did not seem to have any prediction value, so we removed it.
@@ -87,7 +90,7 @@ RoleLevelCount%>%
  colnames(RoleLevelCount)<-c("JobRole", "JobLevel", "Freq")#set column names to improve readability
  RoleLevelCount <- dcast(RoleLevelCount, JobRole ~ JobLevel)#unmelt to get the JobLevels into columns for presentation
  colnames(RoleLevelCount) <- c("JobRole", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5")
- RoleLevelCount$Total <- RoleLevelCount$`Level 1`+RoleLevelCount$`Level 2`+RoleLevelCount$`Level `+RoleLevelCount$`Level 4`+RoleLevelCount$`Level 5`
+ RoleLevelCount$Total <- RoleLevelCount$`Level 1`+RoleLevelCount$`Level 2`+RoleLevelCount$`Level 3`+RoleLevelCount$`Level 4`+RoleLevelCount$`Level 5`
  RoleLevelCount%>%
    arrange(match(JobRole, c("Sales Representative", "Human Resources", "Laboratory Technician", "Research Scientist", "Sales Executive", "Manufacturing Director", "Healthcare Representative", "Research Director", "Manager")))%>%
    kable() %>%
@@ -96,7 +99,7 @@ RoleLevelCount%>%
 ```
 
 ####Figure 2 shows the counts of all associates across roles and levels in our dataset. 
-```{rTable of All Associates  by Role and Level}
+```{r Table of All Associates  by Role and Level}
 #Create a table of JobRoles by level - TOTAL
 RoleLevelCount <- data.frame(table(DFTotal$JobRole, DFTotal$JobLevel))
 colnames(RoleLevelCount)<-c("JobRole", "JobLevel", "Freq")#set column names to improve readability
@@ -126,21 +129,7 @@ RoleLevelCount%>%
 ######Need to fix the range of the grid, the Ex Associates grid is smaller
 
 ```{r Plot of Happiness for Entire Company by Job Role}
-bpcurrent<-ggplot2::ggplot(AttrN, aes(x=JobRole, y=Happiness)) +
-  geom_boxplot()+ 
-  theme(axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5))+ 
-  ggtitle("Cumulative Happiness Score Across Departments - Current Associates, figure 3.1")+
-  scale_fill_manual(values="3182bd")
-bpcurrent
-
-bpgone<-ggplot2::ggplot(AttrY, aes(x=JobRole, y=Happiness)) +
-  geom_boxplot()+ 
-  theme(axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5))+ 
-  ggtitle("Cumulative Happiness Score Across Departments - Ex Associates, fig. 3.2")+
-  scale_fill_manual(values="3182bd")
-bpgone
-
-
+bpall <- ggplot(DFTotal, aes(JobRole, Happiness, fill = Attrition)) + geom_boxplot(alpha = 0.5) + theme(axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5)) + ggtitle("Cumulative Happiness Score Across Departments - Current Associates, figure 3.1") + scale_fill_manual(values = c("#386cb0", "#ffa500"))
 
 # bpall<-ggplot2::ggplot(DFTotal, aes(x=JobRole, y=Happiness)) +
 #   geom_boxplot()+ 
@@ -347,7 +336,7 @@ Highest Accuracy Model uses OverTime,  YearsAtCompany,  YearsInCurrentRole,  Yea
 New_Naive_Bayes_Model4 <- naiveBayes(Attrition ~ OverTime + YearsAtCompany + YearsInCurrentRole + YearsWithCurrManager + JobLevel,data = DFTrain)
 New_Naive_Bayes_Model4
 New_NB_Prediction4 <- predict(New_Naive_Bayes_Model4, DFTrain[,c('OverTime','YearsAtCompany','YearsInCurrentRole','YearsWithCurrManager','JobLevel')])
-confusionMatrix(table(New_NB_Prediction4,DFTrain$Attrition))
+confusionMatrix(table(New_NB_Prediction4, DFTrain$Attrition))
 Test_Data_NB_Pred4 <- predict(New_Naive_Bayes_Model4, DFTest[,c('OverTime','YearsAtCompany','YearsInCurrentRole','YearsWithCurrManager','JobLevel')])
 confusionMatrix(table(Test_Data_NB_Pred4,DFTest$Attrition))
 #Test_Data_NB_Pred4  

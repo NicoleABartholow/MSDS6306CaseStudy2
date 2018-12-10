@@ -56,10 +56,6 @@ AttrN <- DFTotal[grep("No", DFTotal$Attrition), ]
 #Attrition = Yes for contrast and clues
 AttrY <- DFTotal[grep("Yes", DFTotal$Attrition), ]
 #summary(AttrY)
-
-#Make a Pristine Copy of Train and Test - they get bumped around during this write-up and need to be set back to original condition before running models
-CleanTrain <- DFTrain 
-CleanTest <- DFTest
 ```
 
 #Analysis of the Current Associate Population and the Entire Population
@@ -119,6 +115,8 @@ RoleLevelCount%>%
 # p + scale_fill_brewer(palette = "Blues") + 
 #   ggtitle("Distribution of All Sierra Employees by Department")+ 
 #   theme( plot.title = element_text(hjust = 0.5))
+
+
 ```
 
 
@@ -217,14 +215,13 @@ DFTrain %>%
 
 #Correlations between Attrition and Predictors 
 #Attrtion and Overtime- 0.246
-DFTotal$Attrition<-as.integer(DFTotal$Attrition)
+DFTrain$Attrition<-as.integer(DFTrain$Attrition)
 DFTotal$OverTime<-as.integer(DFTotal$OverTime)
 AttOverTime <-cor(DFTotal$Attrition, DFTotal$OverTime, use = "complete.obs") 
 
 
 #Created cutoff variables to highlight associates making it through the first year
 #Create new var Year1 to transform Years with Company to 1 or greater than 1
-DFTrain$Attrition<-as.integer(DFTrain$Attrition)
 DFTrain <- transform(DFTrain, Year1= ifelse(YearsAtCompany== 1, 1, 2))
 DFTest <- transform(DFTest, Year1= ifelse(YearsAtCompany== 1, 1, 2))
 #Attrition and Time with Company <2 years - AttYears = -0.181
@@ -260,9 +257,8 @@ DFTrain <- transform(DFTrain, Single= ifelse(MSInt== 1, 1, 2))
 DFTest$MSInt <- as.integer(DFTest$MaritalStatus)
 DFTest <- transform(DFTest, Single= ifelse(MSInt== 1, 1, 2))
 
-#Unused code to show derived variables
-#DFTrain<- subset(DFTrain, select=-c(Happy ))
-#DFTrain <- transform(DFTrain, Happy= ifelse(Happiness == 1:9, 1, 2))
+DFTrain<- subset(DFTrain, select=-c(Happy ))
+DFTrain <- transform(DFTrain, Happy= ifelse(Happiness == 1:9, 1, 2))
 
 #Attrition and NCW - AttJobInvolvement = -0.150
 AttJobInvolvement <-cor(DFTrain$Attrition, DFTrain$JobInvolvement, use = "complete.obs") 
@@ -334,10 +330,6 @@ confusionMatrix(table(DFTek$Attrition,DFTek$AttPred1))
 ####The highest Accuracy Model uses OverTime,  YearsAtCompany,  YearsInCurrentRole,  YearsWithCurrManager,  JobLevel.  This model achieved 87% Accuracy overall, with nineteen correct Yes, but thirty-one false positives.  Also of note is the Sensitivity of .97 and Specificity of .37.  In our case of predicting Attrition, the cost of a false positives, or Type I error, is lower than the cost of mis-diagnosing a yes as a no, or Type II error.  For our purposes, a model predicting more Yes is generally better, unless it is presuming everyone is a Yes.
 ```{r Naive Bayes prediction Model}
 #Multiple iterations of separate variable attempts are saved in CS2NBModel script
-#resetting these to clean versions before model run
-DFTrain <- CleanTrain
-DFTest <- CleanTest 
-#Best Naive Bayes model of many iterations
 New_Naive_Bayes_Model4 <- naiveBayes(Attrition ~ OverTime + YearsAtCompany + YearsInCurrentRole + YearsWithCurrManager + JobLevel,data = DFTrain)
 New_Naive_Bayes_Model4
 New_NB_Prediction4 <- predict(New_Naive_Bayes_Model4, DFTrain[,c('OverTime','YearsAtCompany','YearsInCurrentRole','YearsWithCurrManager','JobLevel')])

@@ -1,10 +1,10 @@
 # MSDS6306CaseStudy2
 
+R code files detailing the process of an analysis of Attrition Data.
+
 .RData raw data file not usable. 
 
 .Rhistory contains history of code updates. 
-
-R code files detailing the process of an analysis of Attrition Data.
 
 CS2DataBreakdown.R contains r code for an analysis of missing/unneccesary data, removes columns that are irrelevant or have only one value, creates composite Happiness scores with interesting stats and contrasts. 
 

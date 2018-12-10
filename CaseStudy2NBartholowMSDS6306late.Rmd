@@ -1,0 +1,373 @@
+---
+title: "HR Attrition Predictions"
+author: "Nicole Bartholow/Chase Henderson"
+date: "12/9/2018"
+output: pdf_document
+---
+
+```{r Setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(DataExplorer)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(kableExtra)
+library(openintro)
+library(reshape2)
+library(gridExtra)
+library(grid)
+library(mlr)
+library(caret)
+library(e1071)
+library(AppliedPredictiveModeling)
+library(GGally)
+library(corrplot)
+```
+
+#Introduction
+#### AlBaCo Analytics recommended the purchase of Sierra as the perfect complement to InBev’s portfolio.  This report provides an analysis of Sierra’s associates to form a strategy for retention.   
+####One of the reasons InBev in merging with Sierra is their outstanding human capital.  Their research group has produced an impressive array of crowd-pleasing beers with strong brand loyalty, and their sales team has grown their distribution from a local California beer, to a national presence in the just 10 years, necessitating their second brewery in North Carolina.
+####As we move forward with our merger with Sierra, it is critical that we retain this talent that created the company that attracted us.  Using the data provided to us regarding Sierra’s associates, we’ll start by recapping the distribution across departments and roles and then we’ll dig into recent attrition trends.  With that, we have analyzed factors that lead to attrition at Sierra, and created a model to predict folks at risk for attrition in a stable environment, so we can choose to take action to mitigate that risk, or, alternatively, plan for their departure.  On a longer term basis, we can use those factors to devise strategies to reduce attrition by addressing the symptoms.
+####We were provided with a snapshot Sierra associates in two separate data files of 1470 Sierra associates total.  While we have Attrition status for all associates, we used the population of 1170 employees to create a model.  We then test that model to predict the Attrition status of the other 300.   For initial evaluation, we removed columns that were meaningless to attrition analysis either because they were not environmental or because they had no variation in value across the dataset. These columns are ID, Employee Count, Employee Number, Over 18, Standard Hours, and Rand.  
+####On the whole, the model reflected a 16.1% attrition rate, but it is not clear over what time period. As we will see in this report, there is no smoking gun for predicting individual attrition.  But there are some specific risk factors that have straighforward salves. 
+
+```{r Read Attrition Data Files}
+#set working directory for local computer
+#setwd("/Users/nicolealphin/Desktop/DataScience/MSDS6306-DoingDataScience/HW/CaseStudy2")
+DFTrain <- read.csv("./Analysis/Data/CaseStudy2-data.csv", header=TRUE) #import HR Data into DFTrain dataframe
+DFTest <- read.csv("./Analysis/Data/CaseStudy2Validation.csv", header=TRUE) #import HR Validation Set into DFVal dataframe
+
+#Remove columns that are irrelevant or have only one value
+# No information was provided for Rand, but it did not seem to have any prediction value, so we removed it.
+DFTrain<- subset(DFTrain, select=-c(EmployeeCount,EmployeeNumber,Over18,StandardHours, Rand ))
+DFTest<- subset(DFTest, select=-c(EmployeeCount,EmployeeNumber,Over18,StandardHours, Rand ))
+
+#Put Datasets Together for complete counts and pictures.  I'm including these in the entire picture with Attrition information because we have it.
+DFTotal <- rbind(DFTrain, DFTest)
+DFTotal$Happiness <- DFTotal$EnvironmentSatisfaction+DFTotal$JobSatisfaction+DFTotal$RelationshipSatisfaction+DFTotal$WorkLifeBalance
+#summary(DFTotal)
+#Attrition = No for current picture of employees
+AttrN <- DFTotal[grep("No", DFTotal$Attrition), ]
+#summary(AttrN)
+#Attrition = Yes for contrast and clues
+AttrY <- DFTotal[grep("Yes", DFTotal$Attrition), ]
+#summary(AttrY)
+
+#Make a Pristine Copy of Train and Test - they get bumped around during this write-up and need to be set back to original condition before running models
+CleanTrain <- DFTrain 
+CleanTest <- DFTest
+```
+
+#Analysis of the Current Associate Population and the Entire Population
+####First we will take a quick look at the snapshot population of Sierra associates. Then we will review the entire population for the complete overview of the population we are analyzing, including those that have left the company. 
+####The snapshot of Sierra shows a company with 1233 active associates, divided over three departments of Research & Development, Sales and HR.  These departments are further distributed across nine Roles, and within those roles, associates are assigned their level.  Roles have mostly three levels, the exception being Sales Representative, which is only Level 1 and Level 2.  
+####Figure 1 shows the counts of active associates across roles and levels.  
+```{r Table of Active Associates by Role and Level}
+#Create a table of JobRoles by level - CURRENT
+RoleLevelCount <- data.frame(table(AttrN$JobRole, AttrN$JobLevel))
+colnames(RoleLevelCount)<-c("JobRole", "JobLevel", "Freq")#set column names to improve readability
+RoleLevelCount <- dcast(RoleLevelCount, JobRole ~ JobLevel)#unmelt to get the JobLevels into columns for presentation
+colnames(RoleLevelCount) <- c("JobRole", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5")
+RoleLevelCount$Total <- RoleLevelCount$`Level 1`+RoleLevelCount$`Level 2`+RoleLevelCount$`Level 3`+RoleLevelCount$`Level 4`+RoleLevelCount$`Level 5`
+RoleLevelCount%>%
+  arrange(match(JobRole, c("Sales Representative", "Human Resources", "Laboratory Technician", "Research Scientist", "Sales Executive", "Manufacturing Director", "Healthcare Representative", "Research Director", "Manager")))%>%
+  kable() %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+
+#This is in the presentation but not in the doc
+# #Create barplot for Department counts
+# #x must be continuous here, try again
+# #Barplot for Dept counts - CURRENT
+# p <- ggplot(AttrN, aes(x = Department))+geom_bar(fill="#3182bd", colour="black")
+# p + scale_fill_brewer(palette = "Blues") + 
+#   ggtitle("Distribution of Current Sierra Employees by Department, figure 2")+ 
+#   theme( plot.title = element_text(hjust = 0.5))
+#RUN THIS FOR ATTRITION = YES FOR COUNTS - not directly shown
+ # RoleLevelCount <- data.frame(table(AttrY$JobRole, AttrY$JobLevel))
+ # colnames(RoleLevelCount)<-c("JobRole", "JobLevel", "Freq")#set column names to improve readability
+ # RoleLevelCount <- dcast(RoleLevelCount, JobRole ~ JobLevel)#unmelt to get the JobLevels into columns for presentation
+ # colnames(RoleLevelCount) <- c("JobRole", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5")
+ # RoleLevelCount$Total <- RoleLevelCount$`Level 1`+RoleLevelCount$`Level 2`+RoleLevelCount$`Level 3`+RoleLevelCount$`Level 4`+RoleLevelCount$`Level 5`
+ # RoleLevelCount%>%
+ #   arrange(match(JobRole, c("Sales Representative", "Human Resources", "Laboratory Technician", "Research Scientist", "Sales Executive", "Manufacturing Director", "Healthcare Representative", "Research Director", "Manager")))%>%
+ #   kable() %>%
+ #   kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+
+```
+
+####Figure 2 shows the counts of all associates across roles and levels in our dataset. 
+```{r Table of All Associates  by Role and Level}
+#Create a table of JobRoles by level - TOTAL
+RoleLevelCount <- data.frame(table(DFTotal$JobRole, DFTotal$JobLevel))
+colnames(RoleLevelCount)<-c("JobRole", "JobLevel", "Freq")#set column names to improve readability
+RoleLevelCount <- dcast(RoleLevelCount, JobRole ~ JobLevel) #unmelt to get the JobLevels into columns for presentation
+colnames(RoleLevelCount) <- c("JobRole", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5")#set column names to improve readability
+RoleLevelCount$Total <- RoleLevelCount$`Level 1`+RoleLevelCount$`Level 2`+RoleLevelCount$`Level 3`+RoleLevelCount$`Level 4`+RoleLevelCount$`Level 5`
+RoleLevelCount%>%
+  arrange(match(JobRole, c("Sales Representative", "Human Resources", "Laboratory Technician", "Research Scientist", "Sales Executive", "Manufacturing Director", "Healthcare Representative", "Research Director", "Manager")))%>%
+  kable() %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
+
+#This is in the presentation but not in the doc
+# #Barplot for Dept counts - Total
+# p <- ggplot(DFTotal, aes(x = Department))+geom_bar(fill="#3182bd", colour="black")
+# p + scale_fill_brewer(palette = "Blues") + 
+#   ggtitle("Distribution of All Sierra Employees by Department")+ 
+#   theme( plot.title = element_text(hjust = 0.5))
+```
+
+####Sierra collects three measures of Satisfactions, Environment, Job and Relationship.  It also collects a work/life balance rating. Each of these is a 1-4 rating.  Surprisingly, our analysis shows these scores are not correlated, which is good because it means they aren't wasting time collecting double information.  We added these scores together into one rating that we call Happiness.  The idea behind Happiness is that each measure is independent, and if one of them is good, then it can make up for others that are below average.  For example, if your Work/Life balance is poor, but your Environment Satisfaction is Very Good, then some balance is achieved. If the cumulative Happiness is low, then that is an indicator that an associate is missing a balancing positive to make up for negatives.  The median and mean Happiness score for active associates - and for the total population - is right at 11 across all Job Roles. The median Happiness for those who have left is 10. Looking at the box plots in figure 3, we can see that Managers and Lab Technicians also post the median score of 11, but their upper quartiles are higher than other roles, at 13.  The Happiness for the Attrition group is much more unpredictable, with the biggest populations, Lab Tech and Sales Executives and Research Scientist, posting lower ratings.
+```{r Plot of Happiness for Entire Company by Job Role}
+bpall <- ggplot(DFTotal, aes(JobRole, Happiness, fill = Attrition)) + geom_boxplot(alpha = 0.5) + theme(axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5)) + ggtitle("Cumulative Happiness Score - Current Associates, figure 3") + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+bpall
+```
+
+###Attrition by Job Role
+####Turning our attention to the attrition data, it's important to look at the raw counts to assess what is costing the most money.  But it's also important to look at percentages to formulate ideas about patterns and strategies, or drive deeper inquiry. 
+####Figure 4.1 shows the relative population of each role and their attrition counts within that role. We can see that Laboratory Technicians and Sales Executives make up 50% of the attrition group with 62 and 57, respectively.  Including Research Scientists and Sales Representatives covers 84% of the attrition group. Improving attrition in just these two groups provides an opportunity to significantly improve the turnover ratio overall.
+####Looking at the relative percentage in figure 4.2, we hope to identify if we should investigate more systemic issues within a group.  Sales Representative attrition is significantly higher than Sales Executive, from a percentage standpoint, followed by Lab Technician, which we have already identified as a target for more investigation. 
+```{r Analyze Attrtion Counts by Roles}
+
+#Lets just do a straight stacked graph without proportions on JobRole
+RoleAttritionCount <- data.frame(table(DFTotal$JobRole, DFTotal$Attrition))
+colnames(RoleAttritionCount)<- c("JobRole", "Attrition","NumberOfEmployees")
+p <- ggplot(RoleAttritionCount, aes(x=reorder(JobRole, -NumberOfEmployees), y=NumberOfEmployees, fill=Attrition))+geom_bar(stat="identity", colour="black")
+p + scale_fill_manual(values=c("#9ecae1", "#3182bd"))+
+  ggtitle("Employee Population by Job Role with Attrition Count, fig 4.1")+ 
+  theme( axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5))+ 
+  xlab("JobRoles") + ylab("Number of Employees") 
+```
+
+
+```{r  Analyze Attrtion Percentages by Roles}
+#Proportional Stacked Graph to show percentages within Roles
+RoleLevelCount <- data.frame(table(DFTotal$JobRole, DFTotal$JobLevel))#first you need a summarized view of the data
+RoleAttritionCount <- data.frame(table(DFTotal$JobRole, DFTotal$Attrition))#create a summary table for Attrtion by JobRole
+#Calculate percent attrition by role and add it as a new column
+RA <- ddply(RoleAttritionCount, "Var1", transform,
+            percent_attrition = Freq / sum(Freq) * 100)
+colnames(RA)<-c("JobRole", "Attrition", "Freq", "PercentAttrition")#set column names to improve readability
+RA$Order<- c(13, 14, 5, 6, 3, 4, 15, 16, 11, 12, 17, 18, 9, 10, 7, 8, 1, 2)#reorder these so they show in the order we want
+#Proportional Stacked Bar Graph of Attrition by Job Role
+ggplot(RA, aes(x=reorder(JobRole, Order), y=PercentAttrition, fill=Attrition)) +
+    geom_bar(stat="identity", colour="black") +
+    guides(fill=guide_legend(reverse=FALSE)) + 
+    theme(axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5))+ 
+    ggtitle("Percentage Attrition by JobRole, fig. 4.2")+
+  scale_fill_manual(values=c("#9ecae1", "#3182bd"))+ 
+    xlab("Job Roles") + ylab("Percent Attrition") 
+```
+
+###Attrition by Job Level
+####Changing our focus to look at job levels, Figure 5.1 shows the relative population of each level and their attrtion counts within that level. Note that the attrition is actually pushing Level 1 to look larger than Level 2, but in fact, in the stable population, Level 2 has 20% more associates.  From the level perspective, it appears we would want to focus on Levels 1 and 2 from a pure turnover ratio perspective.
+####Looking at the relative percentage in figure 5.2, we see that Level 3 actually has a slightly higher turnover rate than Level 2.
+####Further investigation is warranted to identify how to prioritize Level 2 attrtion versus Level 3 attrition.
+```{r Analyze Attrtion Counts and Percentages by Level}
+DFTotal$JobLevel <- as.factor(DFTotal$JobLevel)
+LevelAttritionCount <- data.frame(table(DFTotal$JobLevel, DFTotal$Attrition))
+colnames(LevelAttritionCount)<- c("JobLevel", "Attrition","NumberOfEmployees")
+p <- ggplot(LevelAttritionCount, aes(x=reorder(JobLevel, -NumberOfEmployees), y=NumberOfEmployees, fill=Attrition))+geom_bar(stat="identity", colour="black")
+p + scale_fill_manual(values=c("#9ecae1", "#3182bd"))+
+  ggtitle("Employee Population by Job Level with Attrition Count, fig. 5.1")+ 
+  theme( axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5))+ 
+  xlab("Job Levels") + ylab("Number of Employees") 
+#create the percentage column for the percent stacked graph
+LA <- ddply(LevelAttritionCount, "JobLevel", transform,
+            percent_attrition = NumberOfEmployees / sum(NumberOfEmployees) * 100)
+colnames(LA)<-c("JobLevel", "Attrition", "Freq", "PercentAttrition")#set column names to improve readability
+
+#Proportional Stacked Bar Graph of Attrition by Job Level
+ggplot(LA, aes(x=JobLevel, y=PercentAttrition, fill=Attrition)) +
+  geom_bar(stat="identity", colour="black") +
+  guides(fill=guide_legend(reverse=FALSE)) + 
+  theme(axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5))+ 
+  ggtitle("Percentage Attrition by Job Level, fig. 5.2")+
+  scale_fill_manual(values=c("#9ecae1", "#3182bd"))+ 
+  xlab("Job Levels") + ylab("Percent Attrition") 
+```
+
+##Predictors
+####We utilized four methodologies for identifying which features to use in our prediction models: logistic regression, graph & correlation analysis, and recursive feature elimination package functions.  Our goal was for each to validate the findings of the other.  We also used correlation plots to identify collinearity between features.  Not surprisingly, all the Years and Age are correlated.  Surprisingly, the Satisfactions do not show any correlation - that's why they should be added together and measured as a cumulative Happiness score.  Also surprisingly, Happiness was not correlated to Attrition.  Most surprisingly, these methodologies mostly did not concur on the best predictors.
+####We began by running a logistic regression to point us in the right direction.  Logistic regression identified the following priorities: Overtime, Environment Satisfaction, Number of Companies Worked, Job Involvement, Business Travel, Years Since Last Promotion, Job Satisfaction, Distance from Home, Work Life Balance, and Marital Status.  That list seems very logical and we embarked on validating it through our other methods. 
+####Direct Correlation did not often agree with the findings from logistic regression.  Direct Correlation Analysis is more mundane than it sounds, running correlation for each variable against Attrtion to and comparing the value to the other results for ranking.  Further analysis indicated that some of the items flagged by logistic regression were only specific values of a categorical variable.  For example, Single versus not Single matters, but Married versus Divorced is not significant.  So we created some derived binary variables out of continuous or categorigal variables to highlight the important transitions.  This improved our correlation scores, but did not improve predictions with the models that we used. In the end, Direct Correlation Analysis prioritized Overtime, Years at Company, Marital Status, Job Involvement and Environment Satisfaction.
+####Graphing showed Attrition relationships with Overtime, number of Companies Worked, Marital Status and Job Level. Other relationships were too subtle to pick up visually. 
+####Because of the contradictions between the logistic regression, correlation and graphing, we decided to employ an automated feature selection function for validation.  Initially we felt this muddies the water, buit directed us towards our best models by highlighting Job Level and all the measurements of Years, which had not shown strong correlation with Attrition. 
+```{r Correlations between Attrition and other variables }
+#This is just a sample of the code from my  500-line CS2Plots script. See GitHub Repository for zip file with more details
+#recast all variables as integers to run collinearity correlation
+DFTrain$EducationField <- as.integer(DFTrain$EducationField)
+DFTrain$JobRole <- as.integer(DFTrain$JobRole)
+DFTrain$OverTime <- as.integer(DFTrain$OverTime)
+DFTrain$MaritalStatus <- as.integer(DFTrain$MaritalStatus)
+DFTrain$BusinessTravel <- as.integer(DFTrain$BusinessTravel)
+# DFTrain %>%
+#   filter(Attrition == "Yes") %>%
+#   select_if(is.numeric) %>%
+#   cor() %>%
+#   corrplot::corrplot()
+# DFTrain %>%
+#   filter(Attrition == "No") %>%
+#   select_if(is.numeric) %>%
+#   cor() %>%
+#   corrplot::corrplot()
+
+#Correlations between Attrition and Predictors 
+#Attrtion and Overtime- 0.246
+DFTotal$Attrition<-as.integer(DFTotal$Attrition)
+DFTotal$OverTime<-as.integer(DFTotal$OverTime)
+AttOverTime <-cor(DFTotal$Attrition, DFTotal$OverTime, use = "complete.obs") 
+
+
+#Created cutoff variables to highlight associates making it through the first year
+#Create new var Year1 to transform Years with Company to 1 or greater than 1
+DFTrain$Attrition<-as.integer(DFTrain$Attrition)
+DFTrain <- transform(DFTrain, Year1= ifelse(YearsAtCompany== 1, 1, 2))
+DFTest <- transform(DFTest, Year1= ifelse(YearsAtCompany== 1, 1, 2))
+#Attrition and Time with Company <2 years - AttYears = -0.181
+AttYearsOneorLess <-cor(DFTrain$Attrition, DFTrain$Year1, use = "complete.obs") 
+
+
+#Create new variable Single to transform Marital Status
+#Attrition and  Marital Satus - 0.162
+DFTrain$MaritalStatus<-as.integer(DFTrain$MaritalStatus)
+AttMaritalStatus <-cor(DFTrain$Attrition, DFTrain$MaritalStatus, use = "complete.obs") 
+#Derived Marital Status
+DFTrain$MSInt <- as.integer(DFTrain$MaritalStatus)
+DFTrain <- transform(DFTrain, Single= ifelse(MSInt== 1, 1, 2))
+DFTest$MSInt <- as.integer(DFTest$MaritalStatus)
+DFTest <- transform(DFTest, Single= ifelse(MSInt== 1, 1, 2))
+AttMSI <-cor(DFTrain$Attrition, DFTrain$MSInt, use = "complete.obs") # - 0.18
+
+#Attrition and NCW - AttJobInvolvement = -0.150
+AttJobInvolvement <-cor(DFTrain$Attrition, DFTrain$JobInvolvement, use = "complete.obs") 
+
+#Attrition and EnvSat - AttES = -0.126
+AttEnvironmentSatisfaction <-cor(DFTrain$Attrition, DFTrain$EnvironmentSatisfaction, use = "complete.obs") 
+
+
+#Create variable for Job Level
+DFTrain <- transform(DFTrain, Job13= ifelse(JobLevel== 1:2, 1, 2))
+#tried to create new break for different types of jobs (i.e. Sales)
+#DFTrain$JobInt <- as.integer(DFTrain$JobRole)
+#DFTrain <- transform(DFTrain, SalesJob= ifelse(JobInt== 8:9, 1, 2))
+
+DFTrain$MSInt <- as.integer(DFTrain$MaritalStatus)
+DFTrain <- transform(DFTrain, Single= ifelse(MSInt== 1, 1, 2))
+DFTest$MSInt <- as.integer(DFTest$MaritalStatus)
+DFTest <- transform(DFTest, Single= ifelse(MSInt== 1, 1, 2))
+
+#Unused code to show derived variables
+#DFTrain<- subset(DFTrain, select=-c(Happy ))
+#DFTrain <- transform(DFTrain, Happy= ifelse(Happiness == 1:9, 1, 2))
+
+#Attrition and NCW - AttJobInvolvement = -0.150
+AttJobInvolvement <-cor(DFTrain$Attrition, DFTrain$JobInvolvement, use = "complete.obs") 
+
+#Attrition and EnvSat - AttES = -0.126
+AttEnvironmentSatisfaction <-cor(DFTrain$Attrition, DFTrain$EnvironmentSatisfaction, use = "complete.obs")
+```
+
+##Prediction Models
+###Neither of these models does a particularly good job of prediction.  Each takes a different approach. kNN starts with the fewest variables and build up because each neighbor requirement can isolate the observation.  
+
+##kNN Prediction Model
+####“Nearest Neighbors” models predicts based on “people like me”. The drawback is that it gets overwhelmed with too many options and the number of “neighbors” quickly diminishes.  Through several iterations guided by the different prediction selection methods, we maximized overall accuracy at .8616 useing: MaritalStatus, JobLevel, OverTime with k=7. This model predicted 9 correct Yes, with Sensitivity of .86 and Specificity of .82.  
+####We felt a model which modestly errored on false positives was a better predictor. Our "Better Predictor of Yes"" uses: MaritalStatus, JobLevel, OverTime & Year1 with k= 7 nearest neighbors. With this model Overall Accuracy drops to 85% Accuracy, with 10 correct Yes predictions. This model had a Sensitivity : 0.8627 and Specificity : 0.6250.   
+```{r kNN Prediction Model}
+#This is just the dataprep and the best model.  
+#Multiple iterations of separate variable attempts are saved in CS2kNN script. See GitHub Repository for zip file with more details
+#create a new dataset to cast features as integers for kNN
+DFTrak <- DFTrain
+DFTrak$Attrition <- as.integer(DFTrak$Attrition)
+DFTrak$MaritalStatus <- as.integer(DFTrak$MaritalStatus)
+DFTrak$OverTime <- as.integer(DFTrak$OverTime)
+
+DFTek <- DFTest
+DFTek$Attrition <- as.integer(DFTek$Attrition)
+DFTek$MaritalStatus <- as.integer(DFTek$MaritalStatus)
+DFTek$OverTime <- as.integer(DFTek$OverTime)
+
+#Job Level, Marital Status, OverTime
+results1 <- class::knn(DFTrak[,c(16, 20, 13)], DFTek[,c(16,20, 13)], DFTrak$Attrition, k=7)
+kNN_Prediction <- results1
+confusionMatrix(table(DFTek$Attrition,kNN_Prediction))
+# 249   2
+# 40   9
+#Sensitivity : 0.8616          
+#Specificity : 0.8182          
+#Pos Pred Value : 0.9920          
+#Neg Pred Value : 0.1837
+
+#Second best model - #pulls one correct yes from a no prediction, but 4 adds 4 false positives - adds Year1
+results1 <- class::knn(DFTrak[,c(20, 33,  13, 16)], DFTek[,c(20, 33,  13, 16)], DFTrak$Attrition, k=7)
+Better_kNN_Prediction <- results1
+confusionMatrix(table(DFTek$Attrition,Better_kNN_Prediction))
+# 1   2
+# 1 245   6
+# 2  39  10
+# Accuracy : 0.85            
+# 95% CI : (0.8045, 0.8884)
+# No Information Rate : 0.9467          
+# P-Value [Acc > NIR] : 1               
+# 
+# Kappa : 0.2472          
+# Mcnemar's Test P-Value : 1.84e-06        
+# 
+# Sensitivity : 0.8627          
+# Specificity : 0.6250          
+# Pos Pred Value : 0.9761          
+# Neg Pred Value : 0.2041  
+
+```
+
+
+##Naive Bayes Prediction Model
+####The naive Bayes model calculates probabilities for each predictor from a learning dataset and applies those probabilities to the test set to make predictions. With naive Bayes, it's simple to start with all the features as possible predictors and prune down the model based on accuracy.  
+####The highest Accuracy Model uses OverTime,  YearsAtCompany,  YearsInCurrentRole,  YearsWithCurrManager,  JobLevel.  This model achieved 87% Accuracy overall, with nineteen correct Yes, but thirty-one false positives.  Also of note is the Sensitivity of .97 and Specificity of .37.  In our case of predicting Attrition, the cost of a false positives, or Type I error, is lower than the cost of mis-diagnosing a yes as a no, or Type II error.  For our purposes, a model predicting more Yes is generally better, unless it is presuming everyone is a Yes.
+```{r Naive Bayes prediction Model}
+#Multiple iterations of separate variable attempts are saved in CS2NBModel script. See Github repository for details
+#resetting these to clean versions before model run
+DFTrain <- CleanTrain
+DFTest <- CleanTest 
+#Best Naive Bayes model of many iterations
+New_Naive_Bayes_Model4 <- naiveBayes(Attrition ~ OverTime + YearsAtCompany + YearsInCurrentRole + YearsWithCurrManager + JobLevel,data = DFTrain)
+New_NB_Prediction4 <- predict(New_Naive_Bayes_Model4, DFTrain[,c('OverTime','YearsAtCompany','YearsInCurrentRole','YearsWithCurrManager','JobLevel')])
+#confusionMatrix(table(New_NB_Prediction4,DFTrain$Attrition))
+Test_Data_NB_Pred4 <- predict(New_Naive_Bayes_Model4, DFTest[,c('OverTime','YearsAtCompany','YearsInCurrentRole','YearsWithCurrManager','JobLevel')])
+confusionMatrix(table(Test_Data_NB_Pred4,DFTest$Attrition))
+
+dfPreds <- cbind(DFTest$ID, Test_Data_NB_Pred4 )
+BivinWD <- getwd()
+write.csv(dfPreds, "BartholowHendersonCase2Preds.csv")
+
+#Test_Data_NB_Pred4  
+#No Yes
+# No  243  31
+# Yes   8  18
+# Accuracy : 0.87            
+# 95% CI : (0.8266, 0.9059)
+# No Information Rate : 0.8367          
+# P-Value [Acc > NIR] : 0.065830        
+# Kappa : 0.4136          
+# Mcnemar's Test P-Value : 0.000427        
+# Sensitivity : 0.9681          
+# Specificity : 0.3673          
+# Pos Pred Value : 0.8869          
+# Neg Pred Value : 0.6923          
+# Prevalence : 0.8367          
+# Detection Rate : 0.8100          
+# Detection Prevalence : 0.9133          
+# Balanced Accuracy : 0.6677
+```
+###Recommendations Summary
+####Neither Model is particularly great at predicting attrition, but the analysis of the trends gives insights and threads to further study, and perhaps a broader array of models.
+####Further investigation is warranted.  The high Level 1 turnover rate should be benchmarked against other jobs of their type, and also should be quantified in terms of hiring and training expenditure. Level 1 roles had a high percentage of Single associates with little work experience.    
+####Analyzing the jobs and levels together, it's also important to view larger opportunity costs with turnover 
+####Further investigation is warranted to identify how to prioritize Level 2 versus Level 3 attrition.
+
+
+#### Other References 
+###Youtube PowerPoint Presentation
+#### https://youtu.be/-5Buai5HdSA
+###Github Respository
+####https://github.com/NicoleABartholow/MSDS6306CaseStudy2

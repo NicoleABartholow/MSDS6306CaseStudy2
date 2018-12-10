@@ -129,8 +129,9 @@ RoleLevelCount%>%
 ######Need to fix the range of the grid, the Ex Associates grid is smaller
 
 ```{r Plot of Happiness for Entire Company by Job Role}
-bpall <- ggplot(DFTotal, aes(JobRole, Happiness, fill = Attrition)) + geom_boxplot(alpha = 0.5) + theme(axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5)) + ggtitle("Cumulative Happiness Score Across Departments - Current Associates, figure 3.1") + scale_fill_manual(values = c("#386cb0", "#ffa500"))
+bpall <- ggplot(DFTotal, aes(JobRole, Happiness, fill = Attrition)) + geom_boxplot(alpha = 0.5) + theme(axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5)) + ggtitle("Cumulative Happiness Score All Departments - Current Associates, figure 3.1") + scale_fill_manual(values = c("#386cb0", "#ffa500"))
 
+bpall
 # bpall<-ggplot2::ggplot(DFTotal, aes(x=JobRole, y=Happiness)) +
 #   geom_boxplot()+ 
 #   theme(axis.text.x=element_text(angle = 90,vjust = 0), plot.title = element_text(hjust = 0.5))+ 
